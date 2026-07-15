@@ -136,6 +136,24 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
 
   useEffect(() => { void refreshCases(""); }, [refreshCases]);
 
+  useEffect(() => {
+    if (tx.phase !== "FINALIZED" || !loadedCase?.caseId) return;
+    let cancelled = false;
+
+    const sync = async () => {
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if (cancelled) return;
+        await refreshCurrentCase();
+        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      }
+    };
+
+    void sync();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadedCase?.caseId, refreshCurrentCase, tx.phase, tx.hash]);
+
   return (
     <div className="prototype-root" data-tone={tweaks.tone} data-density={tweaks.density} style={{ "--tweak-primary": tweaks.hue } as React.CSSProperties}>
       <a className="skip-link" href="#case-workspace">Skip to workspace</a>

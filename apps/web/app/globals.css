@@ -235,6 +235,11 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
 .review-box dd { margin: 0; }
 .form-error { margin: -8px 24px 16px; padding: 10px 12px; color: var(--fs-red-700); background: color-mix(in oklch, var(--fs-red-300) 18%, transparent); border: 1px solid var(--fs-red-300); font-size: var(--fs-text-sm); }
 .form-success { margin: -8px 24px 16px; padding: 10px 12px; color: var(--fs-green-700); background: color-mix(in oklch, var(--fs-green-300) 18%, transparent); border: 1px solid var(--fs-green-300); font-size: var(--fs-text-sm); }
+.evidence-receipt { display: grid; gap: 10px; margin: -8px 24px 16px; padding: 14px; background: color-mix(in oklch, var(--fs-green-300) 10%, var(--surface)); border: 1px solid color-mix(in oklch, var(--fs-green-700) 18%, transparent); border-radius: var(--fs-radius-sm); }
+.evidence-receipt-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+.evidence-receipt-row span { padding-top: 10px; color: var(--subtle); font: 600 11px var(--fs-font-mono); letter-spacing: .06em; text-transform: uppercase; }
+.evidence-receipt-row code { display: block; min-height: 44px; padding: 10px 12px; overflow-wrap: anywhere; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--fs-radius-sm); font-family: var(--fs-font-mono); font-size: var(--fs-text-xs); }
+.button-copy { min-width: 92px; }
 .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--border); }
 .prototype-note { margin: 0; padding: 0 24px 20px; color: var(--subtle); font-size: var(--fs-text-xs); text-align: right; }
 .evidence-warning { display: grid; grid-template-columns: 22px 1fr; gap: 10px; margin: 0 24px 20px; padding: 12px; color: var(--fs-amber-700); background: color-mix(in oklch, var(--fs-amber-300) 18%, var(--surface)); border: 1px solid var(--fs-amber-300); }
@@ -298,6 +303,8 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
   .ledger th:nth-child(2), .ledger td:nth-child(2), .ledger th:nth-child(3), .ledger td:nth-child(3) { display: none; }
   .tabs { overflow-x: auto; }
   .activity-list li { grid-template-columns: 1fr; gap: 4px; }
+  .evidence-receipt-row { grid-template-columns: 1fr; }
+  .evidence-receipt-row span { padding-top: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -122,6 +122,10 @@ function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resul
     || resultCode === "SUCCESS";
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -230,9 +234,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setTx({ phase: "SUBMITTING", hash, message: "Transaction submitted to Studionet." });
     await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.ACCEPTED, retries: 120, interval: 2_000 });
     setTx({ phase: "ACCEPTED", hash, message: "Accepted. Waiting for validator finalization." });
-    const receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 240, interval: 3_000 });
+
+    let receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 240, interval: 3_000 });
     if (!isSuccessfulExecution(receipt)) {
-      throw new Error("Transaction finalized, but contract execution failed");
+      setTx({ phase: "ACCEPTED", hash, message: "Finalized status reached. Verifying execution result..." });
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await sleep(2_500);
+        receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 1, interval: 1_000 });
+        if (isSuccessfulExecution(receipt)) break;
+      }
+    }
+
+    if (!isSuccessfulExecution(receipt)) {
+      const execution = String((receipt as { txExecutionResultName?: unknown }).txExecutionResultName ?? "unknown");
+      const resultCode = String((receipt as { resultCode?: unknown }).resultCode ?? "unknown");
+      throw new Error(`Transaction finalized, but execution still reports ${execution}/${resultCode}`);
     }
     setTx({ phase: "FINALIZED", hash, message: successMessage });
     return value;

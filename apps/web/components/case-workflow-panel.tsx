@@ -52,13 +52,22 @@ export function CaseWorkflowPanel({ caseId, owner, coordinator, spanActors, load
   const canSettle = canOpenDispute;
   const canLinkEvidence = Boolean(address && evidenceSpan && (evidenceSpan.provider?.toLowerCase() === address.toLowerCase() || evidenceSpan.requester?.toLowerCase() === address.toLowerCase() || isManager));
 
+  async function refreshWithPolling() {
+    await onRefresh();
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      await onRefresh();
+    }
+  }
+
   async function run(label: string, action: () => Promise<void>) {
     setWorking(label);
     setMessage(null);
     try {
       await action();
-      await onRefresh();
-      setMessage(`${label} completed.`);
+      setMessage(`${label} finalized. Refreshing live contract state...`);
+      await refreshWithPolling();
+      setMessage(`${label} completed and synced from contract.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `${label} failed.`);
     } finally {
