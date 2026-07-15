@@ -2,14 +2,50 @@
 
 > Failure attribution and automatic recovery for multi-agent commerce.
 
-**Document status:** Locked implementation plan  
+**Document status:** Locked implementation plan with live proof update  
 **Target maturity:** Accelerator-quality, demo-ready prototype  
 **Network:** GenLayer Studionet  
 **RPC:** `https://studio.genlayer.com/api`  
 **Chain ID:** `61999`  
 **GenLayer client:** `genlayer-js@1.1.8`  
 **Intelligent Contract language:** Python  
-**Last updated:** 2026-07-14
+**Last updated:** 2026-07-15
+
+---
+
+## 0. Implementation Status Snapshot — 2026-07-15
+
+### Completed and demonstrated
+
+- Deployed a live Faultspan contract to GenLayer Studionet.
+- Locked the frontend to Studionet, `genlayer-js@1.1.8`, and the deployed contract.
+- Replaced seeded frontend assumptions with real contract reads and honest empty states.
+- Added guided workflow actions for create, register span, accept span, submit delivery, dispute, evidence link, lock, adjudicate, settle, and withdraw.
+- Added Supabase-backed evidence storage and searchable Supabase Postgres projection surfaces.
+- Added Cloudflare Worker backend for wallet challenge, evidence storage, projections, and search.
+- Added a local Studionet finish-case runner that can resume from partially completed states.
+- Recorded a live proof run with real tx hashes for dispute, evidence submit, evidence lock, adjudication, settlement, and withdraw.
+- Verified that GenLayer adjudication fetched the evidence URL, digest-checked it, interpreted its content, and returned a semantic result.
+
+### Proven live outcome
+
+The verified case is documented in [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md).
+
+That proof produced:
+
+- `SETTLED` final case state
+- locked evidence manifest
+- semantic span finding of `INSUFFICIENT_EVIDENCE`
+- validator explanation showing the evidence body referred to the wrong span
+
+This is a valid live proof of web-fetched evidence adjudication, even though it is not yet the ideal “caused failure” demo path from the original scenario text.
+
+### Still left
+
+- Capture a second live proof run where span-correct evidence produces a stronger causal attribution outcome such as `CAUSED_FAILURE`.
+- Deepen the reconciler so it can reconstruct activity even when writes happen outside this app.
+- Add Playwright critical-path end-to-end tests.
+- Complete hosted production release hardening beyond the current hobby/developer deployment posture.
 
 ---
 
@@ -1206,4 +1242,3 @@ Only after this slice passes should implementation proceed to the complete contr
 - [A2A specification](https://a2a-protocol.org/latest/specification/)
 - [x402 offer and receipt extension](https://docs.x402.org/extensions/offer-receipt)
 - [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004)
-

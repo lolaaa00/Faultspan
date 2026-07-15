@@ -6,7 +6,7 @@ Failure attribution and automatic recovery for multi-agent commerce, built on Ge
 
 Weeks 1–11 prototype implementation. The repository contains a lint-valid Intelligent Contract, deterministic domain tests, an evidence API, A2A/x402 evidence adapters, an interactive frontend, an adversarial fixture corpus, design artifacts, deployment preparation, and runbooks.
 
-No Studionet contract deployment is claimed until a funded account submits and verifies the deployment transaction.
+Studionet live proof is now recorded for the deployed contract, including dispute, evidence lock, adjudication, settlement, and withdraw. See [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md).
 
 ## Prerequisites
 
@@ -64,9 +64,9 @@ npm.cmd run build
 - [Integration contracts](docs/INTEGRATIONS.md)
 - [Environment guide](docs/ENVIRONMENT.md)
 - [Demo runbook](docs/DEMO_RUNBOOK.md)
+- [Live Studionet proof](docs/LIVE_PROOF.md)
 - [HTML pitch deck](pitch/faultspan-deck.html)
 
 ## Security boundary
 
 The prototype accepts public synthetic evidence only. Never submit private keys, seed phrases, secrets, personal information, or confidential customer material. The contract and settlement code have not received an independent security audit and must not control material value.
-
