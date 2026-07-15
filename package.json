@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:domain": "npm run test --workspace @faultspan/domain",
-    "reconcile:studionet": "tsx scripts/reconcile-studionet.ts"
+    "reconcile:studionet": "tsx scripts/reconcile-studionet.ts",
+    "test:studionet:finish": "tsx scripts/studionet-finish-case.ts"
   },
   "engines": {
     "node": ">=20"
