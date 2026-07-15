@@ -9,6 +9,13 @@ const spanId = process.env.FAULTSPAN_DISPUTE_SPAN_ID?.trim() || "produce-a-buyer
 const evidenceDigest = process.env.FAULTSPAN_EVIDENCE_DIGEST?.trim();
 const evidencePath = buildEvidencePath();
 const skipWithdraw = process.env.FAULTSPAN_SKIP_WITHDRAW === "1";
+const startFrom = (process.env.FAULTSPAN_START_FROM?.trim().toLowerCase() || "open_dispute") as
+  | "open_dispute"
+  | "submit_evidence"
+  | "lock_evidence"
+  | "adjudicate_case"
+  | "settle_case"
+  | "withdraw";
 
 if (!evidenceDigest) {
   throw new Error("Set FAULTSPAN_EVIDENCE_DIGEST to the stored evidence digest before running this script");
@@ -31,53 +38,80 @@ async function main() {
     spanId,
     evidenceDigest,
     evidencePath,
-    skipWithdraw
+    skipWithdraw,
+    startFrom
   }, null, 2));
 
   const report: Record<string, string> = {};
+  const stepOrder = ["open_dispute", "submit_evidence", "lock_evidence", "adjudicate_case", "settle_case", "withdraw"] as const;
+  const shouldRun = (step: typeof stepOrder[number]) => stepOrder.indexOf(step) >= stepOrder.indexOf(startFrom);
 
-  report.open_dispute = await writeAndFinalize("open_dispute", () => client.writeContract({
-    address: contractAddress,
-    functionName: "open_dispute",
-    args: [caseId, evidencePath, evidenceDigest],
-    value: 0n
-  }) as Promise<TransactionHash>);
+  if (shouldRun("open_dispute")) {
+    report.open_dispute = await writeAndFinalize("open_dispute", () => client.writeContract({
+      address: contractAddress,
+      functionName: "open_dispute",
+      args: [caseId, evidencePath, evidenceDigest],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  } else {
+    console.log("[open_dispute] skipped by FAULTSPAN_START_FROM");
+  }
 
-  report.submit_evidence = await writeAndFinalize("submit_evidence", () => client.writeContract({
-    address: contractAddress,
-    functionName: "submit_evidence",
-    args: [caseId, spanId, evidencePath, evidenceDigest],
-    value: 0n
-  }) as Promise<TransactionHash>);
+  if (shouldRun("submit_evidence")) {
+    report.submit_evidence = await writeAndFinalize("submit_evidence", () => client.writeContract({
+      address: contractAddress,
+      functionName: "submit_evidence",
+      args: [caseId, spanId, evidencePath, evidenceDigest],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  } else {
+    console.log("[submit_evidence] skipped by FAULTSPAN_START_FROM");
+  }
 
-  report.lock_evidence = await writeAndFinalize("lock_evidence", () => client.writeContract({
-    address: contractAddress,
-    functionName: "lock_evidence",
-    args: [caseId],
-    value: 0n
-  }) as Promise<TransactionHash>);
+  if (shouldRun("lock_evidence")) {
+    report.lock_evidence = await writeAndFinalize("lock_evidence", () => client.writeContract({
+      address: contractAddress,
+      functionName: "lock_evidence",
+      args: [caseId],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  } else {
+    console.log("[lock_evidence] skipped by FAULTSPAN_START_FROM");
+  }
 
-  report.adjudicate_case = await writeAndFinalize("adjudicate_case", () => client.writeContract({
-    address: contractAddress,
-    functionName: "adjudicate_case",
-    args: [caseId],
-    value: 0n
-  }) as Promise<TransactionHash>);
+  if (shouldRun("adjudicate_case")) {
+    report.adjudicate_case = await writeAndFinalize("adjudicate_case", () => client.writeContract({
+      address: contractAddress,
+      functionName: "adjudicate_case",
+      args: [caseId],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  } else {
+    console.log("[adjudicate_case] skipped by FAULTSPAN_START_FROM");
+  }
 
-  report.settle_case = await writeAndFinalize("settle_case", () => client.writeContract({
-    address: contractAddress,
-    functionName: "settle_case",
-    args: [caseId],
-    value: 0n
-  }) as Promise<TransactionHash>);
+  if (shouldRun("settle_case")) {
+    report.settle_case = await writeAndFinalize("settle_case", () => client.writeContract({
+      address: contractAddress,
+      functionName: "settle_case",
+      args: [caseId],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  } else {
+    console.log("[settle_case] skipped by FAULTSPAN_START_FROM");
+  }
 
-  if (!skipWithdraw) {
+  if (!skipWithdraw && shouldRun("withdraw")) {
     report.withdraw = await writeAndFinalize("withdraw", () => client.writeContract({
       address: contractAddress,
       functionName: "withdraw",
       args: [],
       value: 0n
     }) as Promise<TransactionHash>);
+  } else if (skipWithdraw) {
+    console.log("[withdraw] skipped by FAULTSPAN_SKIP_WITHDRAW");
+  } else {
+    console.log("[withdraw] skipped by FAULTSPAN_START_FROM");
   }
 
   const finalCase = await client.readContract({
