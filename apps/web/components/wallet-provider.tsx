@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { ExecutionResult, TransactionStatus, type TransactionHash } from "genlayer-js/types";
@@ -48,6 +48,7 @@ type WalletContextValue = {
 };
 
 const STUDIONET_CHAIN_ID = "0xf22f";
+const WALLET_STORAGE_KEY = "faultspan.connectedWallet";
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 function slug(value: string) {
@@ -129,6 +130,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!selected) throw new Error("Wallet returned no account");
       await ensureStudionet(window.ethereum);
       setAddress(selected);
+      window.localStorage.setItem(WALLET_STORAGE_KEY, selected);
     } catch (error) {
       setWalletError(walletMessage(error));
     } finally { setConnecting(false); }
@@ -138,7 +140,62 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setAddress(null);
     setWalletError(null);
     setTx({ phase: "IDLE" });
+    window.localStorage.removeItem(WALLET_STORAGE_KEY);
   }, []);
+
+  useEffect(() => {
+    const provider = window.ethereum as (EthereumProvider & {
+      on?: (event: string, listener: (...args: unknown[]) => void) => void;
+      removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
+    }) | undefined;
+    if (!provider) return;
+
+    let cancelled = false;
+    const restore = async () => {
+      const remembered = window.localStorage.getItem(WALLET_STORAGE_KEY);
+      if (!remembered) return;
+      try {
+        const accounts = await provider.request({ method: "eth_accounts" }) as string[];
+        const match = accounts.find((item) => item.toLowerCase() === remembered.toLowerCase()) as `0x${string}` | undefined;
+        if (!match || cancelled) {
+          if (!match) window.localStorage.removeItem(WALLET_STORAGE_KEY);
+          return;
+        }
+        await ensureStudionet(provider);
+        if (!cancelled) {
+          setAddress(match);
+          setWalletError(null);
+        }
+      } catch {
+        if (!cancelled) window.localStorage.removeItem(WALLET_STORAGE_KEY);
+      }
+    };
+
+    const handleAccountsChanged = (accounts: unknown) => {
+      const next = Array.isArray(accounts) ? accounts[0] : null;
+      if (typeof next === "string" && next) {
+        setAddress(next as `0x${string}`);
+        setWalletError(null);
+        window.localStorage.setItem(WALLET_STORAGE_KEY, next);
+        return;
+      }
+      disconnect();
+    };
+
+    const handleChainChanged = () => {
+      void restore();
+    };
+
+    void restore();
+    provider.on?.("accountsChanged", handleAccountsChanged);
+    provider.on?.("chainChanged", handleChainChanged);
+
+    return () => {
+      cancelled = true;
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
+      provider.removeListener?.("chainChanged", handleChainChanged);
+    };
+  }, [disconnect]);
 
   const runWrite = useCallback(async <T,>(
     label: string,

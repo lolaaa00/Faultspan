@@ -4,17 +4,21 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "services/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace @faultspan/web",
     "build": "npm run build --workspace @faultspan/domain && npm run build --workspace @faultspan/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:domain": "npm run test --workspace @faultspan/domain"
+    "test:domain": "npm run test --workspace @faultspan/domain",
+    "reconcile:studionet": "tsx scripts/reconcile-studionet.ts"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3"
   }
 }
-

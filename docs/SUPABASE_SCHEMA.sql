@@ -74,5 +74,10 @@ alter table public.faultspan_cases enable row level security;
 alter table public.faultspan_spans enable row level security;
 alter table public.faultspan_activity enable row level security;
 
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.faultspan_cases to service_role;
+grant select, insert, update, delete on public.faultspan_spans to service_role;
+grant select, insert, update, delete on public.faultspan_activity to service_role;
+
 -- No public RLS policies are required for the app path because the backend uses the service-role key.
 -- If you later expose this table directly to the browser, add restrictive select policies first.

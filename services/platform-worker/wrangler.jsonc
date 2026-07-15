@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "faultspan-platform",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "FAULTSPAN_ALLOWED_ORIGINS": "http://localhost:3000",
+    "SUPABASE_EVIDENCE_BUCKET": "faultspan-evidence",
+    "FAULTSPAN_MAX_EVIDENCE_BYTES": "256000"
+  }
+}

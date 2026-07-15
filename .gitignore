@@ -5,10 +5,10 @@ coverage/
 .env
 .env.local
 .venv/
+*.tsbuildinfo
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.pyc
 services/platform/data/evidence/*
 !services/platform/data/evidence/.gitkeep
-

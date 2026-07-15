@@ -1,0 +1,16 @@
+{
+  "name": "@faultspan/platform-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "viem": "^2.29.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
