@@ -17,83 +17,90 @@ if (!evidenceDigest) {
 const account = createAccount(privateKey);
 const client = createClient({ chain: studionet, account });
 
-console.log(JSON.stringify({
-  network: "studionet",
-  contractAddress,
-  account: account.address,
-  caseId,
-  spanId,
-  evidenceDigest,
-  evidencePath,
-  skipWithdraw
-}, null, 2));
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
 
-const report: Record<string, string> = {};
+async function main() {
+  console.log(JSON.stringify({
+    network: "studionet",
+    contractAddress,
+    account: account.address,
+    caseId,
+    spanId,
+    evidenceDigest,
+    evidencePath,
+    skipWithdraw
+  }, null, 2));
 
-report.open_dispute = await writeAndFinalize("open_dispute", () => client.writeContract({
-  address: contractAddress,
-  functionName: "open_dispute",
-  args: [caseId, evidencePath, evidenceDigest],
-  value: 0n
-}) as Promise<TransactionHash>);
+  const report: Record<string, string> = {};
 
-report.submit_evidence = await writeAndFinalize("submit_evidence", () => client.writeContract({
-  address: contractAddress,
-  functionName: "submit_evidence",
-  args: [caseId, spanId, evidencePath, evidenceDigest],
-  value: 0n
-}) as Promise<TransactionHash>);
-
-report.lock_evidence = await writeAndFinalize("lock_evidence", () => client.writeContract({
-  address: contractAddress,
-  functionName: "lock_evidence",
-  args: [caseId],
-  value: 0n
-}) as Promise<TransactionHash>);
-
-report.adjudicate_case = await writeAndFinalize("adjudicate_case", () => client.writeContract({
-  address: contractAddress,
-  functionName: "adjudicate_case",
-  args: [caseId],
-  value: 0n
-}) as Promise<TransactionHash>);
-
-report.settle_case = await writeAndFinalize("settle_case", () => client.writeContract({
-  address: contractAddress,
-  functionName: "settle_case",
-  args: [caseId],
-  value: 0n
-}) as Promise<TransactionHash>);
-
-if (!skipWithdraw) {
-  report.withdraw = await writeAndFinalize("withdraw", () => client.writeContract({
+  report.open_dispute = await writeAndFinalize("open_dispute", () => client.writeContract({
     address: contractAddress,
-    functionName: "withdraw",
-    args: [],
+    functionName: "open_dispute",
+    args: [caseId, evidencePath, evidenceDigest],
     value: 0n
   }) as Promise<TransactionHash>);
+
+  report.submit_evidence = await writeAndFinalize("submit_evidence", () => client.writeContract({
+    address: contractAddress,
+    functionName: "submit_evidence",
+    args: [caseId, spanId, evidencePath, evidenceDigest],
+    value: 0n
+  }) as Promise<TransactionHash>);
+
+  report.lock_evidence = await writeAndFinalize("lock_evidence", () => client.writeContract({
+    address: contractAddress,
+    functionName: "lock_evidence",
+    args: [caseId],
+    value: 0n
+  }) as Promise<TransactionHash>);
+
+  report.adjudicate_case = await writeAndFinalize("adjudicate_case", () => client.writeContract({
+    address: contractAddress,
+    functionName: "adjudicate_case",
+    args: [caseId],
+    value: 0n
+  }) as Promise<TransactionHash>);
+
+  report.settle_case = await writeAndFinalize("settle_case", () => client.writeContract({
+    address: contractAddress,
+    functionName: "settle_case",
+    args: [caseId],
+    value: 0n
+  }) as Promise<TransactionHash>);
+
+  if (!skipWithdraw) {
+    report.withdraw = await writeAndFinalize("withdraw", () => client.writeContract({
+      address: contractAddress,
+      functionName: "withdraw",
+      args: [],
+      value: 0n
+    }) as Promise<TransactionHash>);
+  }
+
+  const finalCase = await client.readContract({
+    address: contractAddress,
+    functionName: "get_case",
+    args: [caseId],
+    stateStatus: "accepted"
+  });
+
+  const finalSpan = await client.readContract({
+    address: contractAddress,
+    functionName: "get_span",
+    args: [caseId, spanId],
+    stateStatus: "accepted"
+  });
+
+  console.log("FINAL_REPORT");
+  console.log(JSON.stringify({
+    tx_hashes: report,
+    final_case: finalCase,
+    final_span: finalSpan
+  }, null, 2));
 }
-
-const finalCase = await client.readContract({
-  address: contractAddress,
-  functionName: "get_case",
-  args: [caseId],
-  stateStatus: "accepted"
-});
-
-const finalSpan = await client.readContract({
-  address: contractAddress,
-  functionName: "get_span",
-  args: [caseId, spanId],
-  stateStatus: "accepted"
-});
-
-console.log("FINAL_REPORT");
-console.log(JSON.stringify({
-  tx_hashes: report,
-  final_case: finalCase,
-  final_span: finalSpan
-}, null, 2));
 
 async function writeAndFinalize(label: string, action: () => Promise<TransactionHash>) {
   console.log(`\n[${label}] submitting`);
