@@ -114,6 +114,14 @@ function requireContractAddress() {
   return contract;
 }
 
+function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resultCode?: unknown }) {
+  const execution = String(receipt.txExecutionResultName ?? "");
+  const resultCode = String(receipt.resultCode ?? "");
+  return execution === String(ExecutionResult.FINISHED_WITH_RETURN)
+    || execution === "SUCCESS"
+    || resultCode === "SUCCESS";
+}
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<`0x${string}` | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -223,7 +231,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.ACCEPTED, retries: 120, interval: 2_000 });
     setTx({ phase: "ACCEPTED", hash, message: "Accepted. Waiting for validator finalization." });
     const receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 240, interval: 3_000 });
-    if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+    if (!isSuccessfulExecution(receipt)) {
       throw new Error("Transaction finalized, but contract execution failed");
     }
     setTx({ phase: "FINALIZED", hash, message: successMessage });

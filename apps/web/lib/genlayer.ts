@@ -8,12 +8,20 @@ export const readClient = createClient({ chain: studionet });
 
 export type ReceiptPhase = "SUBMITTED" | "ACCEPTED" | "FINALIZED" | "FAILED";
 
+function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resultCode?: unknown }) {
+  const execution = String(receipt.txExecutionResultName ?? "");
+  const resultCode = String(receipt.resultCode ?? "");
+  return execution === String(ExecutionResult.FINISHED_WITH_RETURN)
+    || execution === "SUCCESS"
+    || resultCode === "SUCCESS";
+}
+
 export async function waitForSuccessfulFinalization(hash: TransactionHash) {
   const receipt = await readClient.waitForTransactionReceipt({
     hash,
     status: TransactionStatus.FINALIZED
   });
-  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+  if (!isSuccessfulExecution(receipt)) {
     throw new Error("Transaction finalized but contract execution failed");
   }
   return receipt;

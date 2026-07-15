@@ -8,6 +8,14 @@ if (!address) throw new Error("Set FAULTSPAN_CONTRACT_ADDRESS before running the
 const client = createClient({ chain: studionet });
 const caseId = process.env.FAULTSPAN_CASE_ID ?? "faultspan-smoke";
 
+function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resultCode?: unknown }) {
+  const execution = String(receipt.txExecutionResultName ?? "");
+  const resultCode = String(receipt.resultCode ?? "");
+  return execution === String(ExecutionResult.FINISHED_WITH_RETURN)
+    || execution === "SUCCESS"
+    || resultCode === "SUCCESS";
+}
+
 const value = await client.readContract({
   address,
   functionName: "get_case",
@@ -21,7 +29,7 @@ if (process.env.FAULTSPAN_TX_HASH) {
     hash: process.env.FAULTSPAN_TX_HASH as `0x${string}`,
     status: TransactionStatus.FINALIZED
   });
-  if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+  if (!isSuccessfulExecution(receipt)) {
     throw new Error(`Transaction finalized without successful execution: ${JSON.stringify(receipt)}`);
   }
   console.log("receipt", receipt);
