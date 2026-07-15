@@ -149,8 +149,11 @@ faultspan/
 ### Proof and tooling
 
 - local finish-case runner with resume support
+- second-proof runner aimed at a stronger causal attribution scenario
 - Studionet receipt handling for accepted/finalized split
 - majority-agree finalized receipt handling
+- Playwright browser end-to-end coverage for stable landing/workspace surfaces
+- reconciler snapshot indexing for cases, spans, and claimable balances
 
 ## What is still left
 
@@ -158,9 +161,8 @@ The repo is strong, but not fully finished against the original master plan.
 
 Main items still left:
 
-- a second live proof run that produces a stronger causal attribution such as `CAUSED_FAILURE`
-- deeper reconciler/indexing for activity written outside this UI
-- Playwright end-to-end tests
+- execution of the second live proof run that produces a stronger causal attribution such as `CAUSED_FAILURE`
+- extending current Playwright coverage into a safe wallet-integrated contract-flow harness
 - fuller hosted production hardening and operational polish
 
 See:
@@ -274,10 +276,26 @@ The finish-case runner supports resume mode through:
 
 - `FAULTSPAN_START_FROM=open_dispute|submit_evidence|lock_evidence|adjudicate_case|settle_case|withdraw`
 
+### Prepare and run the stronger causal second proof
+
+```powershell
+npm run test:studionet:second-proof
+```
+
+This script creates a fresh case, registers the three spans, stores span-correct analysis evidence, and runs the remaining dispute lifecycle so you can capture a second live proof.
+
+### Browser end-to-end coverage
+
+```powershell
+npm run test:e2e
+```
+
 ## Demo and proof references
 
 - [docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md)
 - [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md)
+- [docs/SECOND_PROOF_RUNBOOK.md](docs/SECOND_PROOF_RUNBOOK.md)
+- [docs/PRODUCTION_HARDENING.md](docs/PRODUCTION_HARDENING.md)
 - [FAULTSPAN_MASTER_PLAN.md](FAULTSPAN_MASTER_PLAN.md)
 
 ## Design and pitch artifacts

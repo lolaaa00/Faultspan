@@ -31,3 +31,15 @@ Recommended Vercel frontend env:
 - `NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999`
 
 If your Vercel project uses a custom domain, add that origin to `FAULTSPAN_ALLOWED_ORIGINS` in `services/platform-worker/wrangler.jsonc` or through a Worker redeploy.
+
+## Hardened deployment checklist
+
+- Run `docs/SUPABASE_SCHEMA.sql` before first live write.
+- Confirm `GET /health` returns `ok`.
+- Confirm `GET /ready` returns `ready`.
+- Set explicit custom-domain origins in `FAULTSPAN_ALLOWED_ORIGINS`.
+- Tail the Worker during first live write:
+  - `npx wrangler tail faultspan-platform`
+- Verify the frontend points to the correct Worker URL.
+- Verify the frontend points to the intended Studionet contract address.
+- Rotate any demo-only secrets or exposed wallet keys before public demos.

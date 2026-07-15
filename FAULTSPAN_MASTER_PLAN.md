@@ -24,6 +24,9 @@
 - Added Supabase-backed evidence storage and searchable Supabase Postgres projection surfaces.
 - Added Cloudflare Worker backend for wallet challenge, evidence storage, projections, and search.
 - Added a local Studionet finish-case runner that can resume from partially completed states.
+- Added a second live-proof runner that creates a fresh case and aims at a span-correct causal attribution outcome.
+- Added Playwright browser end-to-end coverage for the landing and stable workspace evidence surfaces.
+- Deepened the reconciler so it records case-state, span-state, and claimable-balance snapshots independently of app-driven writes.
 - Recorded a live proof run with real tx hashes for dispute, evidence submit, evidence lock, adjudication, settlement, and withdraw.
 - Verified that GenLayer adjudication fetched the evidence URL, digest-checked it, interpreted its content, and returned a semantic result.
 
@@ -38,13 +41,12 @@ That proof produced:
 - semantic span finding of `INSUFFICIENT_EVIDENCE`
 - validator explanation showing the evidence body referred to the wrong span
 
-This is a valid live proof of web-fetched evidence adjudication, even though it is not yet the ideal “caused failure” demo path from the original scenario text.
+This is a valid live proof of web-fetched evidence adjudication, even though it is not yet the ideal `CAUSED_FAILURE` demo path from the original scenario text.
 
 ### Still left
 
-- Capture a second live proof run where span-correct evidence produces a stronger causal attribution outcome such as `CAUSED_FAILURE`.
-- Deepen the reconciler so it can reconstruct activity even when writes happen outside this app.
-- Add Playwright critical-path end-to-end tests.
+- Execute and record the second live proof run where span-correct evidence produces a stronger causal attribution outcome such as `CAUSED_FAILURE`.
+- Extend current Playwright coverage into a safe wallet-integrated contract-flow harness.
 - Complete hosted production release hardening beyond the current hobby/developer deployment posture.
 
 ---

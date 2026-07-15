@@ -192,6 +192,10 @@ async function appendActivity(payload: ActivityRecord) {
   return (await response.json())[0];
 }
 
+async function upsertSnapshotActivity(payload: ActivityRecord) {
+  return appendActivity(payload);
+}
+
 async function loadCase(caseId: string) {
   const rawCase = normalizeRecord<ContractCaseRecord>(await client.readContract({
     address: contractAddress!,
@@ -236,6 +240,16 @@ async function reconcileCase(caseId: string) {
   };
   await upsertCaseProjection(caseProjection);
 
+  const status = stringValue(recordValue(rawCase, "status", "status"), "OPEN");
+  const claimant = stringValue(recordValue(rawCase, "claimant", "claimant")) || stringValue(recordValue(rawCase, "owner", "owner"));
+  const evidenceLocked = boolValue(recordValue(rawCase, "evidence_locked", "evidenceLocked"));
+  const settled = boolValue(recordValue(rawCase, "settled", "settled"));
+  const totalBonded = bigintishToString(recordValue(rawCase, "total_bonded", "totalBonded"));
+  const totalSlashed = bigintishToString(recordValue(rawCase, "total_slashed", "totalSlashed"));
+  const manifest = stringValue(recordValue(rawCase, "evidence_manifest", "evidenceManifest"));
+  const manifestEntries = manifest.split(/\r?\n/u).map((item) => item.trim()).filter(Boolean).length;
+
+  const actors = new Set<string>([caseProjection.owner, caseProjection.coordinator, claimant].filter(Boolean));
   for (const item of spans) {
     const spanProjection: SpanProjection = {
       case_id: caseId,
@@ -248,28 +262,63 @@ async function reconcileCase(caseId: string) {
       status: stringValue(recordValue(item.record, "status", "status"), "PROPOSED")
     };
     await upsertSpanProjection(spanProjection);
+    actors.add(spanProjection.requester);
+    actors.add(spanProjection.provider);
+    await upsertSnapshotActivity({
+      activity_id: `reconcile:span:${caseId}:${item.spanId}:${spanProjection.status}:${stringValue(recordValue(item.record, "finding", "finding"), "NONE")}`,
+      case_id: caseId,
+      span_id: item.spanId,
+      actor: spanProjection.provider || claimant,
+      action: "reconcile_span_state",
+      status: "FINALIZED",
+      tx_hash: null,
+      summary: `Span ${item.spanId} is ${spanProjection.status}${stringValue(recordValue(item.record, "finding", "finding")) ? ` with finding ${stringValue(recordValue(item.record, "finding", "finding"))}` : ""}`
+    });
   }
 
-  const status = stringValue(recordValue(rawCase, "status", "status"), "OPEN");
-  const claimant = stringValue(recordValue(rawCase, "claimant", "claimant")) || stringValue(recordValue(rawCase, "owner", "owner"));
-  await appendActivity({
-    activity_id: `reconcile:${caseId}:${Date.now()}`,
+  await upsertSnapshotActivity({
+    activity_id: `reconcile:case:${caseId}:${status}:${evidenceLocked}:${settled}:${manifestEntries}`,
     case_id: caseId,
     span_id: null,
     actor: claimant,
-    action: "reconcile_snapshot",
+    action: "reconcile_case_state",
     status: "FINALIZED",
     tx_hash: null,
-    summary: `Reconciled on-chain snapshot for ${caseId} (${status})`
+    summary: `Case ${caseId} is ${status}; evidence_locked=${evidenceLocked}; settled=${settled}; manifest_entries=${manifestEntries}; bonded=${totalBonded}; slashed=${totalSlashed}`
   });
+
+  for (const actor of actors) {
+    if (!actor || !actor.startsWith("0x")) continue;
+    try {
+      const claimable = await client.readContract({
+        address: contractAddress!,
+        functionName: "get_claimable",
+        args: [actor as `0x${string}`],
+        stateStatus: "latest"
+      } as never);
+      const amount = bigintishToString(claimable);
+      await upsertSnapshotActivity({
+        activity_id: `reconcile:claimable:${caseId}:${actor}:${amount}`,
+        case_id: caseId,
+        span_id: null,
+        actor,
+        action: "reconcile_claimable",
+        status: "FINALIZED",
+        tx_hash: null,
+        summary: `Claimable balance for ${actor} is ${amount} wei`
+      });
+    } catch {
+      // keep reconciliation best-effort for claimable snapshots
+    }
+  }
 
   return {
     caseId,
     status,
-    settled: boolValue(recordValue(rawCase, "settled", "settled")),
-    evidenceLocked: boolValue(recordValue(rawCase, "evidence_locked", "evidenceLocked")),
-    totalBonded: bigintishToString(recordValue(rawCase, "total_bonded", "totalBonded")),
-    totalSlashed: bigintishToString(recordValue(rawCase, "total_slashed", "totalSlashed")),
+    settled,
+    evidenceLocked,
+    totalBonded,
+    totalSlashed,
     spanCount: spans.length
   };
 }

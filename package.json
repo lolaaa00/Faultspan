@@ -12,14 +12,17 @@
     "build": "npm run build --workspace @faultspan/domain && npm run build --workspace @faultspan/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
     "test:domain": "npm run test --workspace @faultspan/domain",
     "reconcile:studionet": "tsx scripts/reconcile-studionet.ts",
-    "test:studionet:finish": "tsx scripts/studionet-finish-case.ts"
+    "test:studionet:finish": "tsx scripts/studionet-finish-case.ts",
+    "test:studionet:second-proof": "tsx scripts/studionet-second-proof.ts"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "tsx": "^4.20.3"
   }
 }
