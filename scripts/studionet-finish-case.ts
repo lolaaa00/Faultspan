@@ -146,11 +146,28 @@ async function writeAndFinalize(label: string, action: () => Promise<Transaction
 }
 
 function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resultCode?: unknown }) {
-  const execution = String(receipt.txExecutionResultName ?? "");
-  const resultCode = String(receipt.resultCode ?? "");
+  const receiptRecord = receipt as {
+    txExecutionResultName?: unknown;
+    resultCode?: unknown;
+    status_name?: unknown;
+    result_name?: unknown;
+    consensus_data?: {
+      leader_receipt?: Array<{ execution_result?: unknown }>;
+      validators?: Array<{ execution_result?: unknown }>;
+    };
+  };
+
+  const execution = String(receiptRecord.txExecutionResultName ?? "");
+  const resultCode = String(receiptRecord.resultCode ?? "");
+  const statusName = String(receiptRecord.status_name ?? "");
+  const resultName = String(receiptRecord.result_name ?? "");
+  const leaderExecution = receiptRecord.consensus_data?.leader_receipt?.some((item) => String(item.execution_result ?? "") === "SUCCESS") ?? false;
+  const validatorExecution = receiptRecord.consensus_data?.validators?.some((item) => String(item.execution_result ?? "") === "SUCCESS") ?? false;
+
   return execution === String(ExecutionResult.FINISHED_WITH_RETURN)
     || execution === "SUCCESS"
-    || resultCode === "SUCCESS";
+    || resultCode === "SUCCESS"
+    || (statusName === "FINALIZED" && resultName === "MAJORITY_AGREE" && (leaderExecution || validatorExecution));
 }
 
 function buildEvidencePath() {
