@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Activity, ArrowUpRight, BookOpen, ChevronRight, CircleDollarSign, FileCheck2, FileText, FileUp, Gavel, LayoutDashboard, LockKeyhole, Network, Plus, Search, ShieldCheck, Split, TerminalSquare } from "lucide-react";
 import { CreateCaseDialog } from "./create-case-dialog";
 import { LiabilityGraph } from "./liability-graph";
@@ -18,12 +20,12 @@ type Tab = "evidence" | "settlement" | "activity";
 type View = "overview" | "cases" | "obligations" | "evidence" | "docs";
 
 const nav = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "cases", label: "Cases", icon: Gavel },
-  { id: "obligations", label: "Obligations", icon: Network },
-  { id: "evidence", label: "Evidence", icon: FileCheck2 },
-  { id: "docs", label: "Integration", icon: BookOpen }
-] satisfies { id: View; label: string; icon: typeof LayoutDashboard }[];
+  { id: "overview", href: "/overview", label: "Overview", icon: LayoutDashboard },
+  { id: "cases", href: "/cases", label: "Cases", icon: Gavel },
+  { id: "obligations", href: "/obligations", label: "Obligations", icon: Network },
+  { id: "evidence", href: "/evidence", label: "Evidence", icon: FileCheck2 },
+  { id: "docs", href: "/integration", label: "Integration", icon: BookOpen }
+] satisfies { id: View; href: string; label: string; icon: typeof LayoutDashboard }[];
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return <div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
@@ -74,6 +76,7 @@ function toViewSpans(loaded: LoadedFaultspanCase | null): ObligationSpanView[] {
 }
 
 export function FaultspanPrototype({ initialView = "overview" }: { initialView?: View }) {
+  const router = useRouter();
   const [loadedCase, setLoadedCase] = useState<LoadedFaultspanCase | null>(null);
   const spans = useMemo(() => toViewSpans(loadedCase), [loadedCase]);
   const [selectedId, setSelectedId] = useState("");
@@ -93,8 +96,8 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
   const { tx, submitEvidence } = useFaultspanWallet();
   const selectedSpan = spans.find((span) => span.id === selectedId);
 
-  const openCaseBuilder = () => { setView("cases"); setCreateOpen(true); };
-  const openEvidenceBuilder = () => { setView("evidence"); setEvidenceOpen(true); };
+  const openCaseBuilder = () => { setView("cases"); router.push("/cases"); setCreateOpen(true); };
+  const openEvidenceBuilder = () => { setView("evidence"); router.push("/evidence"); setEvidenceOpen(true); };
   const refreshCases = useCallback(async (query = caseQuery) => {
     setCaseSearchError(null);
     try {
@@ -137,11 +140,11 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
     <div className="prototype-root" data-tone={tweaks.tone} data-density={tweaks.density} style={{ "--tweak-primary": tweaks.hue } as React.CSSProperties}>
       <a className="skip-link" href="#case-workspace">Skip to workspace</a>
       <aside className="sidebar" aria-label="Primary navigation">
-        <button className="brand brand-button" onClick={() => setView("overview")} aria-label="Faultspan overview"><span>F/</span><strong>FAULTSPAN</strong></button>
+        <Link className="brand brand-button" href="/overview" aria-label="Faultspan overview"><span>F/</span><strong>FAULTSPAN</strong></Link>
         <nav>
           {nav.map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><Icon aria-hidden="true" />{item.label}</button>;
+            return <Link key={item.id} href={item.href} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined}><Icon aria-hidden="true" />{item.label}</Link>;
           })}
         </nav>
         <div className="sidebar-foot"><span className="network-light" aria-hidden="true"></span><div><strong>Studionet</strong><small>Chain 61999</small></div></div>
@@ -149,7 +152,7 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
 
       <div className="app-column">
         <header className="topbar">
-          <form className="search" onSubmit={(event) => { event.preventDefault(); setView("cases"); void refreshCases(caseQuery); }}><Search aria-hidden="true" size={16} /><input aria-label="Search cases" placeholder="Search real cases, agents, tx hashes" value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} /></form>
+          <form className="search" onSubmit={(event) => { event.preventDefault(); setView("cases"); router.push("/cases"); void refreshCases(caseQuery); }}><Search aria-hidden="true" size={16} /><input aria-label="Search cases" placeholder="Search real cases, agents, tx hashes" value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} /></form>
           <div className="topbar-actions"><span className="network-chip"><span aria-hidden="true"></span>Studionet</span><WalletButton /></div>
         </header>
 
@@ -162,7 +165,7 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
           </section>}
 
           {view === "cases" && <>
-            <div className="case-breadcrumb"><button onClick={() => setView("overview")}>Overview</button><ChevronRight aria-hidden="true" size={14} /><span>Cases</span></div>
+            <div className="case-breadcrumb"><Link href="/overview">Overview</Link><ChevronRight aria-hidden="true" size={14} /><span>Cases</span></div>
             <section className="case-heading" aria-labelledby="case-title"><div><div className="eyebrow-row"><span className="eyebrow">Real Studionet mode</span><span className="status status-disputed"><Gavel aria-hidden="true" size={13} />Live contract</span></div><h1 id="case-title">{loadedCase ? loadedCase.caseId : "No synthetic case loaded"}</h1><p>{loadedCase ? `Loaded from get_case/get_case_span_ids/get_span. Current status: ${loadedCase.caseRecord.status || "unknown"}.` : "Create a case against the configured Studionet contract or query a real case id. This workspace no longer seeds demo disputes."}</p></div><div className="case-actions"><button className="button button-secondary"><FileText aria-hidden="true" size={16} />Export record</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Add evidence</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" size={16} />New case</button></div></section>
             <section className="case-search-panel" aria-label="Search and load cases"><form className="case-search-row" onSubmit={(event) => { event.preventDefault(); void refreshCases(caseQuery); }}><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Search indexed cases or paste a case id" aria-label="Case search or case id" /><button className="button button-secondary" type="submit"><Search aria-hidden="true" size={16} />Search</button><button className="button button-primary" type="button" disabled={!caseQuery.trim() || caseLoading} onClick={() => void loadCase(caseQuery.trim())}>{caseLoading ? "Loading..." : "Load from contract"}</button></form>{caseSearchError && <p className="form-error">{caseSearchError}</p>}<div className="case-list">{caseList.map((item) => <button key={item.case_id} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.case_id} · {item.status} · {item.tx_hash ?? "no tx hash indexed"}</small></span><ChevronRight aria-hidden="true" size={16} /></button>)}</div></section>
             {searchResults.length > 0 && <section className="workspace-panel explorer-panel" aria-labelledby="explorer-title"><header className="panel-head"><div><span className="eyebrow">Projection explorer</span><h2 id="explorer-title">Cases, spans, activity, tx hashes</h2></div></header><div className="explorer-list">{searchResults.map((item, index) => <button key={`${item.result_type}-${item.case_id}-${item.span_id ?? ""}-${item.tx_hash ?? ""}-${index}`} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.result_type} · {item.case_id}{item.span_id ? ` · ${item.span_id}` : ""}{item.tx_hash ? ` · ${item.tx_hash}` : ""}</small></span><span>{item.subtitle}</span></button>)}</div></section>}

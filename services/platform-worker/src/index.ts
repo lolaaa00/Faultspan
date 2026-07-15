@@ -479,7 +479,12 @@ async function listCases(env: Env, query: string) {
     order: "updated_at.desc",
     limit: "50"
   });
-  if (query) qs.set("or", `case_id.ilike.%${query}%,title.ilike.%${query}%,tx_hash.ilike.%${query}%,owner.ilike.%${query}%`);
+  if (query) qs.set("or", `(${[
+    `case_id.ilike.%${query}%`,
+    `title.ilike.%${query}%`,
+    `tx_hash.ilike.%${query}%`,
+    `owner.ilike.%${query}%`
+  ].join(",")})`);
   const response = await supabase(env, `/rest/v1/faultspan_cases?${qs.toString()}`, { method: "GET" });
   return await response.json();
 }
@@ -607,7 +612,7 @@ async function searchProjection(env: Env, query: string): Promise<SearchResult[]
 
 async function searchRows(env: Env, table: string, query: string, columns: string[]) {
   const qs = new URLSearchParams({ select: "*", limit: "50" });
-  if (query) qs.set("or", columns.map((column) => `${column}.ilike.%${query}%`).join(","));
+  if (query) qs.set("or", `(${columns.map((column) => `${column}.ilike.%${query}%`).join(",")})`);
   const response = await supabase(env, `/rest/v1/${table}?${qs.toString()}`, { method: "GET" });
   return await response.json();
 }
