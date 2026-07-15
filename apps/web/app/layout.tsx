@@ -8,7 +8,12 @@ import { WalletProvider } from "@/components/wallet-provider";
 
 export const metadata: Metadata = {
   title: "Faultspan — Multi-agent failure attribution",
-  description: "Inspect obligations, adjudicate failures, and recover value across multi-agent transactions."
+  description: "Inspect obligations, adjudicate failures, and recover value across multi-agent transactions.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

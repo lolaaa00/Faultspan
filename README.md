@@ -1,21 +1,188 @@
 # Faultspan
 
-Failure attribution and automatic recovery for multi-agent commerce, built on GenLayer.
+Faultspan is a GenLayer-native dispute and recovery layer for multi-agent commerce.
 
-## Current maturity
+It models delegated work as a graph of obligation spans, stores public evidence, asks GenLayer validators to interpret what happened when a workflow fails, and then applies deterministic settlement logic to bonds and recoverable value.
 
-Weeks 1–11 prototype implementation. The repository contains a lint-valid Intelligent Contract, deterministic domain tests, an evidence API, A2A/x402 evidence adapters, an interactive frontend, an adversarial fixture corpus, design artifacts, deployment preparation, and runbooks.
+## What this repo currently is
 
-Studionet live proof is now recorded for the deployed contract, including dispute, evidence lock, adjudication, settlement, and withdraw. See [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md).
+This repository is a working accelerator-grade prototype with:
 
-## Prerequisites
+- a live Python GenLayer Intelligent Contract
+- a Next.js frontend for wallet-driven case workflows
+- a Cloudflare Worker backend for wallet challenge auth, evidence storage, and searchable projections
+- Supabase Storage for evidence objects
+- Supabase Postgres-backed projection/search surfaces
+- real Studionet proof of dispute, evidence lock, adjudication, settlement, and withdraw
 
-- Node.js 20+; verified locally with Node 24.16.0.
-- npm 7+; verified locally with npm 11.13.0.
-- Python 3.12+; the project virtual environment uses Python 3.12.10.
-- GenLayer CLI; verified locally with version 0.39.0.
+This is not just a mock UI. The current build has already been exercised against a deployed Studionet contract with recorded transaction hashes.
 
-## Install
+## Product summary
+
+Faultspan answers a specific question:
+
+When a final agent-produced result fails, which exact obligation failed, what evidence supports that conclusion, and how should value recovery happen?
+
+The system is built around:
+
+- obligation spans
+- evidence bundles
+- GenLayer adjudication
+- deterministic settlement
+
+In practice, that means Faultspan can:
+
+- create a real case
+- register delegated spans
+- accept spans with bonds
+- submit delivery references
+- open disputes
+- store and fetch evidence by digest
+- link evidence on-chain
+- lock evidence
+- adjudicate with GenLayer validators
+- settle the case
+- withdraw claimable funds
+
+## Live proof status
+
+The current live proof run is documented here:
+
+- [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md)
+
+That proof covers:
+
+- deployed Studionet contract
+- real case read/write flow
+- real evidence URL fetch
+- real dispute open
+- real evidence lock
+- real adjudication
+- real settlement
+- real withdraw
+
+## Stack
+
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- IBM Plex Sans / IBM Plex Mono
+
+### Chain integration
+
+- GenLayer Studionet
+- `genlayer-js@1.1.8`
+- Python Intelligent Contract
+
+### Backend and storage
+
+- Cloudflare Worker platform API
+- Supabase Storage for evidence
+- Supabase Postgres projections/search
+
+## Network and contract
+
+- Network: GenLayer Studionet
+- RPC: `https://studio.genlayer.com/api`
+- Chain ID: `61999`
+- Contract: `0x23B6F12322d811918c4Ca5De210529d6cB09Df5D`
+
+## Repository structure
+
+```text
+faultspan/
+├── apps/
+│   └── web/                        # Next.js app
+├── contracts/
+│   └── faultspan.py               # GenLayer Intelligent Contract
+├── docs/
+│   ├── LIVE_PROOF.md              # Recorded real Studionet run
+│   ├── ENVIRONMENT.md             # Env variables and setup guidance
+│   ├── DEMO_RUNBOOK.md            # Demo flow guidance
+│   ├── INTEGRATIONS.md            # A2A/x402 notes
+│   └── CLOUDFLARE_WORKER_DEPLOY.md
+├── evaluation/                    # Fixtures and validation utilities
+├── pitch/                         # HTML deck
+├── scripts/                       # Deploy/test/reconcile scripts
+├── services/
+│   ├── platform/                  # Python/FastAPI platform service
+│   └── platform-worker/           # Cloudflare Worker backend
+└── FAULTSPAN_MASTER_PLAN.md       # Full plan and status
+```
+
+## Features already implemented
+
+### Contract and workflow
+
+- case creation
+- span registration
+- span acceptance and bonding
+- delivery submission
+- dispute open
+- evidence link
+- evidence lock
+- adjudication
+- settlement
+- withdraw
+
+### Frontend UX
+
+- wallet connect and disconnect
+- overview, cases, obligations, evidence, integration routes
+- guided case lifecycle panel
+- real case loading from contract
+- searchable projections
+- evidence dialog with copyable digest and public path
+- verified-case reference flow on the overview page
+- GEN-formatted visible bond values instead of raw wei
+
+### Backend/API
+
+- wallet challenge + verification
+- evidence object storage by digest
+- evidence retrieval endpoint
+- projection storage for cases, spans, and activity
+- search across cases, spans, activity, and tx hashes
+
+### Proof and tooling
+
+- local finish-case runner with resume support
+- Studionet receipt handling for accepted/finalized split
+- majority-agree finalized receipt handling
+
+## What is still left
+
+The repo is strong, but not fully finished against the original master plan.
+
+Main items still left:
+
+- a second live proof run that produces a stronger causal attribution such as `CAUSED_FAILURE`
+- deeper reconciler/indexing for activity written outside this UI
+- Playwright end-to-end tests
+- fuller hosted production hardening and operational polish
+
+See:
+
+- [FAULTSPAN_MASTER_PLAN.md](FAULTSPAN_MASTER_PLAN.md)
+
+## Local prerequisites
+
+Verified locally in this workspace:
+
+- Node.js `24.16.0`
+- npm `11.13.0`
+- Python `3.12.10`
+- GenLayer CLI `0.39.0`
+
+Recommended minimums:
+
+- Node.js 20+
+- npm 7+
+- Python 3.12+
+
+## Installation
 
 ```powershell
 npm.cmd install
@@ -25,9 +192,39 @@ Copy-Item .env.example .env.local
 Copy-Item .env.example apps\web\.env.local
 ```
 
-Read [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) before filling the environment files.
+Before filling values, read:
 
-## Run
+- [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)
+
+## Environment configuration
+
+There are two main runtime surfaces:
+
+### Frontend
+
+Set in `apps/web/.env.local`:
+
+- `NEXT_PUBLIC_GENLAYER_RPC_URL`
+- `NEXT_PUBLIC_GENLAYER_CHAIN_ID`
+- `NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS`
+- `NEXT_PUBLIC_PLATFORM_API_URL`
+
+### Backend / Worker / storage
+
+Configured through Cloudflare Worker env/secrets and Supabase:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_EVIDENCE_BUCKET`
+- `FAULTSPAN_SESSION_SECRET`
+
+Full reference:
+
+- [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)
+
+## Running locally
+
+### Platform API
 
 Terminal 1:
 
@@ -35,15 +232,19 @@ Terminal 1:
 .\.venv\Scripts\python.exe -m uvicorn faultspan_platform.main:app --host 127.0.0.1 --port 8000
 ```
 
+### Frontend
+
 Terminal 2:
 
 ```powershell
 npm.cmd run dev
 ```
 
-Open `http://localhost:3000`.
+Then open:
 
-## Verify
+- `http://localhost:3000`
+
+## Verification commands
 
 ```powershell
 npm.cmd run typecheck
@@ -55,18 +256,51 @@ $env:PYTHONUTF8='1'; .\.venv\Scripts\genvm-lint.exe check contracts\faultspan.py
 npm.cmd run build
 ```
 
-## Important artifacts
+## Useful scripts
 
-- [Master plan](FAULTSPAN_MASTER_PLAN.md)
-- [Design discovery](design/DISCOVERY.md)
-- [Wireframe comparison](design/wireframes.html)
-- [Component inventory](design/COMPONENT_INVENTORY.md)
-- [Integration contracts](docs/INTEGRATIONS.md)
-- [Environment guide](docs/ENVIRONMENT.md)
-- [Demo runbook](docs/DEMO_RUNBOOK.md)
-- [Live Studionet proof](docs/LIVE_PROOF.md)
-- [HTML pitch deck](pitch/faultspan-deck.html)
+### Reconcile Studionet state
 
-## Security boundary
+```powershell
+npm run reconcile:studionet
+```
 
-The prototype accepts public synthetic evidence only. Never submit private keys, seed phrases, secrets, personal information, or confidential customer material. The contract and settlement code have not received an independent security audit and must not control material value.
+### Finish a partially completed live case
+
+```powershell
+npm run test:studionet:finish
+```
+
+The finish-case runner supports resume mode through:
+
+- `FAULTSPAN_START_FROM=open_dispute|submit_evidence|lock_evidence|adjudicate_case|settle_case|withdraw`
+
+## Demo and proof references
+
+- [docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md)
+- [docs/LIVE_PROOF.md](docs/LIVE_PROOF.md)
+- [FAULTSPAN_MASTER_PLAN.md](FAULTSPAN_MASTER_PLAN.md)
+
+## Design and pitch artifacts
+
+- [design/DISCOVERY.md](design/DISCOVERY.md)
+- [design/COMPONENT_INVENTORY.md](design/COMPONENT_INVENTORY.md)
+- [design/wireframes.html](design/wireframes.html)
+- [pitch/faultspan-deck.html](pitch/faultspan-deck.html)
+
+## Security and usage boundary
+
+This prototype accepts public synthetic evidence only.
+
+Do not submit:
+
+- private keys
+- seed phrases
+- secrets
+- personal information
+- confidential customer data
+
+The contract, settlement logic, and surrounding application have not received an independent production security audit and must not control material value.
+
+## Immediate operational note
+
+If any private key has been exposed in chat, logs, or screenshots during testing, rotate it immediately and stop using it.
