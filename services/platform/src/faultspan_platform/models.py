@@ -77,6 +77,56 @@ class CaseProjectionOut(CaseProjectionIn):
     updated_at: float | None = None
 
 
+class SpanProjectionIn(BaseModel):
+    case_id: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    span_id: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    parent_id: str | None = Field(default=None, max_length=64)
+    requester: str
+    provider: str
+    obligation: str = Field(min_length=3, max_length=4_000)
+    bond_wei: str = Field(pattern=r"^[0-9]+$")
+    status: str = Field(default="PROPOSED", min_length=1, max_length=64)
+    tx_hash: str | None = Field(default=None, max_length=128)
+
+    @field_validator("requester", "provider")
+    @classmethod
+    def normalize_participant_addresses(cls, value: str) -> str:
+        return ChallengeRequest(address=value).address
+
+
+class SpanProjectionOut(SpanProjectionIn):
+    updated_at: float | None = None
+
+
+class ActivityRecordIn(BaseModel):
+    case_id: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    span_id: str | None = Field(default=None, max_length=64)
+    actor: str
+    action: str = Field(min_length=1, max_length=128)
+    status: str = Field(default="FINALIZED", min_length=1, max_length=64)
+    tx_hash: str | None = Field(default=None, max_length=128)
+    summary: str = Field(min_length=3, max_length=500)
+
+    @field_validator("actor")
+    @classmethod
+    def normalize_actor(cls, value: str) -> str:
+        return ChallengeRequest(address=value).address
+
+
+class ActivityRecordOut(ActivityRecordIn):
+    activity_id: str
+    created_at: float | None = None
+
+
+class SearchResult(BaseModel):
+    result_type: Literal["case", "span", "activity", "transaction"]
+    case_id: str
+    span_id: str | None = None
+    tx_hash: str | None = None
+    title: str
+    subtitle: str
+
+
 class X402Receipt(BaseModel):
     receipt_id: str = Field(min_length=3, max_length=128)
     payer: str

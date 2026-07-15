@@ -6,7 +6,9 @@ import { useFaultspanWallet } from "./wallet-provider";
 
 type Props = {
   caseId: string;
+  owner: `0x${string}` | null;
   coordinator: `0x${string}` | null;
+  spanActors: Array<{ spanId: string; provider?: string; requester?: string; status?: string }>;
   loaded: boolean;
   onEvidenceDraft(input: { caseId: string; spanId: string; obligation: string; statement: string }): Promise<{ digest: string; publicPath: string }>;
   onRefresh(): Promise<void>;
@@ -16,7 +18,7 @@ function slug(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 42);
 }
 
-export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft, onRefresh }: Props) {
+export function CaseWorkflowPanel({ caseId, owner, coordinator, spanActors, loaded, onEvidenceDraft, onRefresh }: Props) {
   const {
     address,
     registerSpan,
@@ -39,6 +41,16 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
   const [deliveryRef, setDeliveryRef] = useState("https://example.com/faultspan/delivery.json");
   const [evidenceSpanId, setEvidenceSpanId] = useState("root-span");
   const [statement, setStatement] = useState("This evidence shows the provider missed a required validation step.");
+  const selectedSpan = spanActors.find((item) => item.spanId === spanId.trim());
+  const evidenceSpan = spanActors.find((item) => item.spanId === evidenceSpanId.trim());
+  const isManager = Boolean(address && (address === owner || address === coordinator));
+  const canAcceptSelectedSpan = Boolean(address && selectedSpan?.provider?.toLowerCase() === address.toLowerCase());
+  const canDeliverSelectedSpan = Boolean(address && selectedSpan?.provider?.toLowerCase() === address.toLowerCase());
+  const canOpenDispute = Boolean(address && loaded);
+  const canLockEvidence = canOpenDispute;
+  const canAdjudicate = canOpenDispute;
+  const canSettle = canOpenDispute;
+  const canLinkEvidence = Boolean(address && evidenceSpan && (evidenceSpan.provider?.toLowerCase() === address.toLowerCase() || evidenceSpan.requester?.toLowerCase() === address.toLowerCase() || isManager));
 
   async function run(label: string, action: () => Promise<void>) {
     setWorking(label);
@@ -107,9 +119,10 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
         <article className="workflow-card">
           <div className="workflow-card-head"><Bot aria-hidden="true" size={16} /><strong>3-span demo path</strong></div>
           <p>Seed the master-plan demo structure using the connected wallet as provider for all three spans.</p>
-          <button className="button button-primary" disabled={!loaded || !!working} onClick={() => run("3-span demo seed", seedDemoSpans)}>
+          <button className="button button-primary" disabled={!loaded || !!working || !isManager} onClick={() => run("3-span demo seed", seedDemoSpans)}>
             <Play aria-hidden="true" size={16} />{working === "3-span demo seed" ? "Running..." : "Seed 3 spans"}
           </button>
+          <small>{isManager ? "Connected wallet can manage this case." : "Only the case owner or coordinator should seed spans."}</small>
         </article>
 
         <article className="workflow-card">
@@ -123,7 +136,7 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
           </div>
           <button
             className="button button-secondary"
-            disabled={!loaded || !!working || !address}
+            disabled={!loaded || !!working || !address || !isManager}
             onClick={() => run("Register span", async () => {
               await registerSpan({
                 caseId,
@@ -140,6 +153,7 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
           >
             <Plus aria-hidden="true" size={16} />Register
           </button>
+          <small>{isManager ? "Manager action." : "Register span is limited to case manager wallets."}</small>
         </article>
 
         <article className="workflow-card">
@@ -149,11 +163,12 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
             <input value={spanId} onChange={(event) => setSpanId(event.target.value)} placeholder="span id" />
             <input value={bond} onChange={(event) => setBond(event.target.value)} placeholder="bond wei" />
           </div>
-          <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Accept span", async () => {
+          <button className="button button-secondary" disabled={!loaded || !!working || !canAcceptSelectedSpan} onClick={() => run("Accept span", async () => {
             await acceptSpan({ caseId, spanId: spanId.trim(), bondWei: BigInt(bond.trim() || "0") });
           })}>
             <Wallet aria-hidden="true" size={16} />Accept span
           </button>
+          <small>{canAcceptSelectedSpan ? "Provider action." : "Only the named provider for this span should accept and bond it."}</small>
         </article>
 
         <article className="workflow-card">
@@ -162,11 +177,12 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
             <input value={spanId} onChange={(event) => setSpanId(event.target.value)} placeholder="span id" />
             <input value={deliveryRef} onChange={(event) => setDeliveryRef(event.target.value)} placeholder="delivery URL or artifact ref" />
           </div>
-          <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Submit delivery", async () => {
+          <button className="button button-secondary" disabled={!loaded || !!working || !canDeliverSelectedSpan} onClick={() => run("Submit delivery", async () => {
             await submitDelivery({ caseId, spanId: spanId.trim(), deliveryRef: deliveryRef.trim() });
           })}>
             <Send aria-hidden="true" size={16} />Submit delivery
           </button>
+          <small>{canDeliverSelectedSpan ? "Provider action." : "Only the provider attached to this span should submit delivery."}</small>
         </article>
 
         <article className="workflow-card">
@@ -175,7 +191,7 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
             <input value={evidenceSpanId} onChange={(event) => setEvidenceSpanId(event.target.value)} placeholder="span id" />
             <textarea value={statement} onChange={(event) => setStatement(event.target.value)} rows={3} placeholder="evidence statement" />
           </div>
-          <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Open dispute", async () => {
+          <button className="button button-secondary" disabled={!loaded || !!working || !canOpenDispute} onClick={() => run("Open dispute", async () => {
             const stored = await onEvidenceDraft({
               caseId,
               spanId: evidenceSpanId.trim(),
@@ -186,7 +202,7 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
           })}>
             <Gavel aria-hidden="true" size={16} />Open dispute
           </button>
-          <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Link evidence", async () => {
+          <button className="button button-secondary" disabled={!loaded || !!working || !canLinkEvidence} onClick={() => run("Link evidence", async () => {
             const stored = await onEvidenceDraft({
               caseId,
               spanId: evidenceSpanId.trim(),
@@ -202,17 +218,19 @@ export function CaseWorkflowPanel({ caseId, coordinator, loaded, onEvidenceDraft
           })}>
             <Link2 aria-hidden="true" size={16} />Submit contract evidence
           </button>
+          <small>{canLinkEvidence ? "Participant action." : "Evidence linking is limited to case participants and managers."}</small>
         </article>
 
         <article className="workflow-card">
           <div className="workflow-card-head"><LockKeyhole aria-hidden="true" size={16} /><strong>Resolve case</strong></div>
           <p>Lock evidence, ask GenLayer for judgment, settle the economic result, then withdraw claimable balance.</p>
           <div className="workflow-actions">
-            <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Lock evidence", async () => { await lockEvidence(caseId); })}>Lock evidence</button>
-            <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Adjudicate case", async () => { await adjudicateCase(caseId); })}>Adjudicate</button>
-            <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Settle case", async () => { await settleCase(caseId); })}>Settle</button>
+            <button className="button button-secondary" disabled={!loaded || !!working || !canLockEvidence} onClick={() => run("Lock evidence", async () => { await lockEvidence(caseId); })}>Lock evidence</button>
+            <button className="button button-secondary" disabled={!loaded || !!working || !canAdjudicate} onClick={() => run("Adjudicate case", async () => { await adjudicateCase(caseId); })}>Adjudicate</button>
+            <button className="button button-secondary" disabled={!loaded || !!working || !canSettle} onClick={() => run("Settle case", async () => { await settleCase(caseId); })}>Settle</button>
             <button className="button button-secondary" disabled={!loaded || !!working} onClick={() => run("Withdraw", async () => { await withdrawClaimable(); })}>Withdraw</button>
           </div>
+          <small>Withdraw is wallet-specific. Lock, adjudicate, and settle should be run by a participant with case authority.</small>
         </article>
       </div>
 

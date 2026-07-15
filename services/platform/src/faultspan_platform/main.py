@@ -4,9 +4,14 @@ from .config import Settings
 from .evidence import create_evidence_store
 from .models import (
     A2ATask,
+    ActivityRecordIn,
+    ActivityRecordOut,
     CaseProjectionIn,
     CaseProjectionOut,
     NormalizedA2ASpan,
+    SearchResult,
+    SpanProjectionIn,
+    SpanProjectionOut,
     ChallengeRequest,
     ChallengeResponse,
     EvidenceBundle,
@@ -16,7 +21,8 @@ from .models import (
     X402Receipt,
     X402Verification,
 )
-from .projection import CaseProjection, create_projection_store
+from .projection import ActivityRecord, CaseProjection, SpanProjection, create_projection_store
+from time import time
 from .security import Session, WalletAuth
 from .x402 import verify_receipt
 from .a2a import normalize_task
@@ -121,6 +127,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="case not indexed")
         return CaseProjectionOut(**case.__dict__)
 
+    @app.get("/v1/cases/{case_id}/spans", response_model=list[SpanProjectionOut])
+    def list_case_spans(case_id: str) -> list[SpanProjectionOut]:
+        try:
+            return [SpanProjectionOut(**span.__dict__) for span in projection.list_spans(case_id)]
+        except Exception as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="span projection store is unavailable") from error
+
+    @app.get("/v1/cases/{case_id}/activity", response_model=list[ActivityRecordOut])
+    def list_case_activity(case_id: str) -> list[ActivityRecordOut]:
+        try:
+            return [ActivityRecordOut(**activity.__dict__) for activity in projection.list_activity(case_id)]
+        except Exception as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="activity projection store is unavailable") from error
+
     @app.post("/v1/cases", response_model=CaseProjectionOut, status_code=status.HTTP_201_CREATED)
     def upsert_case_projection(case: CaseProjectionIn, current: Session = Depends(session)) -> CaseProjectionOut:
         if current.address != case.owner:
@@ -130,6 +150,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="case projection store is unavailable") from error
         return CaseProjectionOut(**saved.__dict__)
+
+    @app.post("/v1/spans", response_model=SpanProjectionOut, status_code=status.HTTP_201_CREATED)
+    def upsert_span_projection(span: SpanProjectionIn, current: Session = Depends(session)) -> SpanProjectionOut:
+        if current.address != span.requester and current.address != span.provider:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session does not own span")
+        try:
+            saved = projection.upsert_span(SpanProjection(**span.model_dump()))
+        except Exception as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="span projection store is unavailable") from error
+        return SpanProjectionOut(**saved.__dict__)
+
+    @app.post("/v1/activity", response_model=ActivityRecordOut, status_code=status.HTTP_201_CREATED)
+    def append_activity_record(activity: ActivityRecordIn, current: Session = Depends(session)) -> ActivityRecordOut:
+        if current.address != activity.actor:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session does not own activity actor")
+        payload = ActivityRecord(
+            activity_id=f"{activity.case_id}:{activity.action}:{int(time() * 1000)}",
+            case_id=activity.case_id,
+            span_id=activity.span_id,
+            actor=activity.actor,
+            action=activity.action,
+            status=activity.status,
+            tx_hash=activity.tx_hash,
+            summary=activity.summary,
+        )
+        try:
+            saved = projection.append_activity(payload)
+        except Exception as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="activity projection store is unavailable") from error
+        return ActivityRecordOut(**saved.__dict__)
+
+    @app.get("/v1/search", response_model=list[SearchResult])
+    def search_projection(query: str = "") -> list[SearchResult]:
+        try:
+            return [SearchResult(**item.__dict__) for item in projection.search(query)]
+        except Exception as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="search projection store is unavailable") from error
 
     @app.post("/v1/integrations/x402/verify", response_model=X402Verification)
     def verify_x402(receipt: X402Receipt) -> X402Verification:

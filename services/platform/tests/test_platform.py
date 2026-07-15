@@ -111,6 +111,65 @@ def test_case_projection_requires_owner_session_and_is_searchable(tmp_path: Path
     assert forbidden.status_code == 403
 
 
+def test_span_activity_and_search_projections_are_queryable(tmp_path: Path):
+    api = client(tmp_path)
+    owner = Account.create()
+    token = authenticate(api, owner)
+
+    case_payload = {
+        "case_id": "case-003",
+        "title": "Agent report dispute",
+        "owner": owner.address,
+        "coordinator": owner.address,
+        "contract_address": "0x1c3cdE1FdB758971F0F2D06BafBdd194ca9d86eb",
+        "tx_hash": "0xcase003",
+        "status": "OPEN",
+    }
+    assert api.post("/v1/cases", json=case_payload, headers={"Authorization": f"Bearer {token}"}).status_code == 201
+
+    span_payload = {
+        "case_id": "case-003",
+        "span_id": "analysis-span",
+        "parent_id": None,
+        "requester": owner.address,
+        "provider": owner.address,
+        "obligation": "Validate sources before finalizing conclusions.",
+        "bond_wei": "1000000000000000",
+        "status": "PROPOSED",
+        "tx_hash": "0xspan003",
+    }
+    created_span = api.post("/v1/spans", json=span_payload, headers={"Authorization": f"Bearer {token}"})
+    assert created_span.status_code == 201
+    assert created_span.json()["span_id"] == "analysis-span"
+
+    activity_payload = {
+        "case_id": "case-003",
+        "span_id": "analysis-span",
+        "actor": owner.address,
+        "action": "register_span",
+        "status": "FINALIZED",
+        "tx_hash": "0xspan003",
+        "summary": "Registered the analysis span",
+    }
+    created_activity = api.post("/v1/activity", json=activity_payload, headers={"Authorization": f"Bearer {token}"})
+    assert created_activity.status_code == 201
+    assert created_activity.json()["action"] == "register_span"
+
+    spans = api.get("/v1/cases/case-003/spans")
+    assert spans.status_code == 200
+    assert spans.json()[0]["span_id"] == "analysis-span"
+
+    activity = api.get("/v1/cases/case-003/activity")
+    assert activity.status_code == 200
+    assert activity.json()[0]["summary"] == "Registered the analysis span"
+
+    search = api.get("/v1/search", params={"query": "0xspan003"})
+    assert search.status_code == 200
+    result_types = {item["result_type"] for item in search.json()}
+    assert "span" in result_types
+    assert "transaction" in result_types
+
+
 def test_x402_boundary_verifies_party_signature(tmp_path: Path):
     api = client(tmp_path)
     payer = Account.create()
