@@ -154,7 +154,7 @@ async function storeEvidenceBundle() {
     ]
   };
 
-  const response = await fetch(`${platformApi}/v1/evidence`, {
+  const response = await fetchWithRetry(`${platformApi}/v1/evidence`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -172,7 +172,7 @@ async function storeEvidenceBundle() {
 }
 
 async function createPlatformSession() {
-  const challengeResponse = await fetch(`${platformApi}/v1/auth/challenge`, {
+  const challengeResponse = await fetchWithRetry(`${platformApi}/v1/auth/challenge`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ address: account.address.toLowerCase() })
@@ -180,7 +180,7 @@ async function createPlatformSession() {
   if (!challengeResponse.ok) throw new Error(await challengeResponse.text());
   const challenge = await challengeResponse.json() as { challenge_id: string; message: string };
   const signature = await account.signMessage({ message: challenge.message });
-  const verifyResponse = await fetch(`${platformApi}/v1/auth/verify`, {
+  const verifyResponse = await fetchWithRetry(`${platformApi}/v1/auth/verify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ challenge_id: challenge.challenge_id, signature })
@@ -241,4 +241,24 @@ function envHex(name: string) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: string, init: RequestInit, attempts = 4) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(input, { ...init, signal: controller.signal });
+      clearTimeout(timeout);
+      return response;
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (attempt === attempts) break;
+      console.log(`[fetch retry ${attempt}/${attempts}] ${input}`);
+      await sleep(2_500 * attempt);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`Fetch failed for ${input}`);
 }
