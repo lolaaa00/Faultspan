@@ -176,6 +176,16 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
 .bond-row div { display: grid; gap: 4px; padding: 16px var(--panel-padding); background: var(--surface-2); }
 
 .case-record { margin-top: 16px; }
+.workflow-panel { margin: 16px 0; }
+.workflow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--border); border-top: 1px solid var(--border); }
+.workflow-card { display: grid; align-content: start; gap: 12px; min-height: 220px; padding: 18px; background: var(--surface); }
+.workflow-card p { margin: 0; color: var(--muted); font-size: var(--fs-text-sm); line-height: 1.55; }
+.workflow-card-head { display: flex; align-items: center; gap: 8px; }
+.workflow-card-head svg { color: var(--primary); }
+.workflow-fields { display: grid; gap: 8px; }
+.workflow-fields input, .workflow-fields textarea, .workflow-inline input { width: 100%; min-height: 42px; padding: 10px 12px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--fs-radius-sm); }
+.workflow-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.workflow-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .tabs { display: flex; gap: 4px; padding: 8px var(--panel-padding) 0; border-bottom: 1px solid var(--border); }
 .tabs button { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 12px; color: var(--muted); background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
 .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--primary); }
@@ -246,6 +256,7 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
   .inspector { display: grid; grid-template-columns: 1fr 1fr; }
   .inspector .panel-head, .provider-line, .bond-row { grid-column: 1 / -1; }
   .verdict-callout { align-self: start; }
+  .workflow-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 800px) {
@@ -269,6 +280,7 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
   .settlement-row span:nth-child(4)::before { content: "Slash · "; color: var(--subtle); }
   .settlement-row.heading { display: none; }
   .prototype-footer { flex-direction: column; }
+  .workflow-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {

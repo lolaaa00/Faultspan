@@ -12,6 +12,7 @@ import { listCaseProjections, type CaseProjection } from "@/lib/platform-api";
 import { readFaultspanCase, type LoadedFaultspanCase } from "@/lib/faultspan-contract";
 import type { Address, Finding, SpanStatus } from "@faultspan/domain";
 import type { ObligationSpanView } from "./liability-graph";
+import { CaseWorkflowPanel } from "./case-workflow-panel";
 
 type Tab = "evidence" | "settlement" | "activity";
 type View = "overview" | "cases" | "obligations" | "evidence" | "docs";
@@ -86,7 +87,7 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [tweaks, setTweaks] = useState<Tweaks>(defaultTweaks);
   const updateTweaks = useCallback((value: Tweaks) => setTweaks(value), []);
-  const { tx } = useFaultspanWallet();
+  const { tx, submitEvidence } = useFaultspanWallet();
   const selectedSpan = spans.find((span) => span.id === selectedId);
 
   const openCaseBuilder = () => { setView("cases"); setCreateOpen(true); };
@@ -113,6 +114,14 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
       setCaseLoading(false);
     }
   }, []);
+  const refreshCurrentCase = useCallback(async () => {
+    if (!loadedCase?.caseId) return;
+    await loadCase(loadedCase.caseId);
+  }, [loadCase, loadedCase?.caseId]);
+  const draftEvidence = useCallback(async (input: { caseId: string; spanId: string; obligation: string; statement: string }) => {
+    const receipt = await submitEvidence(input);
+    return { digest: receipt.digest, publicPath: receipt.publicPath };
+  }, [submitEvidence]);
 
   useEffect(() => { void refreshCases(""); }, [refreshCases]);
 
@@ -149,6 +158,13 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
             <section className="case-heading" aria-labelledby="case-title"><div><div className="eyebrow-row"><span className="eyebrow">Real Studionet mode</span><span className="status status-disputed"><Gavel aria-hidden="true" size={13} />Live contract</span></div><h1 id="case-title">{loadedCase ? loadedCase.caseId : "No synthetic case loaded"}</h1><p>{loadedCase ? `Loaded from get_case/get_case_span_ids/get_span. Current status: ${loadedCase.caseRecord.status || "unknown"}.` : "Create a case against the configured Studionet contract or query a real case id. This workspace no longer seeds demo disputes."}</p></div><div className="case-actions"><button className="button button-secondary"><FileText aria-hidden="true" size={16} />Export record</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Add evidence</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" size={16} />New case</button></div></section>
             <section className="case-search-panel" aria-label="Search and load cases"><form className="case-search-row" onSubmit={(event) => { event.preventDefault(); void refreshCases(caseQuery); }}><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Search indexed cases or paste a case id" aria-label="Case search or case id" /><button className="button button-secondary" type="submit"><Search aria-hidden="true" size={16} />Search</button><button className="button button-primary" type="button" disabled={!caseQuery.trim() || caseLoading} onClick={() => void loadCase(caseQuery.trim())}>{caseLoading ? "Loading..." : "Load from contract"}</button></form>{caseSearchError && <p className="form-error">{caseSearchError}</p>}<div className="case-list">{caseList.map((item) => <button key={item.case_id} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.case_id} · {item.status} · {item.tx_hash ?? "no tx hash indexed"}</small></span><ChevronRight aria-hidden="true" size={16} /></button>)}</div></section>
             <section className="case-facts" aria-label="Case facts"><Metric label="Bonded value" value={`${String(loadedCase?.caseRecord.totalBonded ?? 0n)} wei`} detail={loadedCase ? "From get_case" : "Awaiting real case"} /><Metric label="Evidence" value={`${loadedCase?.caseRecord.evidence_manifest?.split("\n").filter(Boolean).length ?? 0} refs`} detail={loadedCase ? "Manifest entries" : "No manifest loaded"} /><Metric label="Current phase" value={loadedCase?.caseRecord.status || "Not loaded"} detail="Studionet accepted state" /><Metric label="Potential recovery" value={`${String(loadedCase?.caseRecord.totalSlashed ?? 0n)} wei`} detail="After adjudication/settlement" /></section>
+            <CaseWorkflowPanel
+              caseId={loadedCase?.caseId ?? caseQuery.trim()}
+              coordinator={loadedCase?.caseRecord.coordinator ? loadedCase.caseRecord.coordinator as `0x${string}` : null}
+              loaded={Boolean(loadedCase?.caseId)}
+              onEvidenceDraft={draftEvidence}
+              onRefresh={refreshCurrentCase}
+            />
             <div className="workspace-grid"><section className="workspace-panel graph-panel" aria-labelledby="graph-title"><header className="panel-head"><div><span className="eyebrow">Liability topology</span><h2 id="graph-title">Obligation graph</h2></div><div className="segmented" aria-label="Graph display mode"><button className={tweaks.view === "graph" ? "active" : ""} onClick={() => updateTweaks({ ...tweaks, view: "graph" })}>Graph</button><button className={tweaks.view === "ledger" ? "active" : ""} onClick={() => updateTweaks({ ...tweaks, view: "ledger" })}>Ledger</button></div></header><LiabilityGraph spans={spans} selectedId={selectedId} onSelect={setSelectedId} mode={tweaks.view} /></section><aside className="workspace-panel inspector" aria-labelledby="inspector-title"><header className="panel-head"><div><span className="eyebrow">Selected span</span><h2 id="inspector-title">{selectedSpan?.label ?? "Nothing selected"}</h2></div></header>{selectedSpan ? <><section className="provider-line"><span className="agent-mark">{selectedSpan.provider.slice(0, 1)}</span><div><strong>{selectedSpan.provider}</strong><span>{selectedSpan.address}</span></div></section><section className="inspector-section"><h3>Contract status</h3><p>{selectedSpan.status} · finding {selectedSpan.finding}</p></section><section className="inspector-section"><h3>Evidence</h3><p>{selectedSpan.evidenceCount ? selectedSpan.evidence[0]?.digest : "No evidence refs on this span yet."}</p></section></> : <section className="empty-state"><ShieldCheck aria-hidden="true" /><h3>Real data only</h3><p>No obligation span is loaded from the contract yet. Create a case or query a real case id; no demo findings are shown here.</p></section>}</aside></div>
             <section className="workspace-panel case-record"><div className="tabs" role="tablist" aria-label="Case record"><button role="tab" aria-selected={tab === "evidence"} onClick={() => setTab("evidence")}><FileCheck2 aria-hidden="true" size={15} />Evidence</button><button role="tab" aria-selected={tab === "settlement"} onClick={() => setTab("settlement")}><CircleDollarSign aria-hidden="true" size={15} />Settlement</button><button role="tab" aria-selected={tab === "activity"} onClick={() => setTab("activity")}><Activity aria-hidden="true" size={15} />Activity</button></div>{tab === "evidence" && <div className="tab-content evidence-summary"><div><LockKeyhole aria-hidden="true" /><span><strong>No manifest loaded</strong><small className="mono">waiting for real evidence</small></span></div><p>Evidence submitted through this app is stored in the configured private Supabase bucket and referenced by content digest. No seeded evidence is displayed.</p><button className="button button-secondary" onClick={openEvidenceBuilder}>Add evidence<ArrowUpRight aria-hidden="true" size={15} /></button></div>}{tab === "settlement" && <div className="tab-content empty-state"><CircleDollarSign aria-hidden="true" /><h3>No settlement computed</h3><p>Settlement rows will stay empty until a real case is adjudicated by the configured Studionet contract.</p></div>}{tab === "activity" && <div className="tab-content empty-state"><Activity aria-hidden="true" /><h3>No activity loaded</h3><p>There is no synthetic timeline. New transactions will appear through the live transaction banner while you test.</p></div>}</section>
           </>}
