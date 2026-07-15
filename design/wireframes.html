@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faultspan wireframe directions</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; color: #202020; background: #ededeb; font: 14px/1.45 sans-serif; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .intro { max-width: 720px; margin: 0 0 32px; color: #555; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(300px, 1fr)); gap: 24px; align-items: start; }
+    .variation { padding: 16px; border: 1px solid #aaa; background: #f8f8f6; }
+    .variation h2 { margin: 0 0 4px; font-size: 18px; }
+    .variation > p { min-height: 60px; margin: 0 0 16px; color: #666; }
+    .screen { min-height: 620px; border: 2px solid #333; background: #fff; }
+    .topbar { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #777; }
+    .shell { display: grid; grid-template-columns: 90px 1fr; min-height: 572px; }
+    .nav { padding: 12px 8px; border-right: 1px solid #aaa; background: #ececea; }
+    .nav div { height: 28px; margin-bottom: 8px; border: 1px solid #aaa; background: #ddd; }
+    .main { padding: 16px; }
+    .bar { height: 12px; margin-bottom: 8px; background: #ccc; }
+    .bar.short { width: 54%; }
+    .box { border: 1px solid #888; background: #f1f1ef; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+    .stats .box { height: 68px; }
+    .table { display: grid; gap: 1px; background: #aaa; border: 1px solid #aaa; }
+    .row { display: grid; grid-template-columns: 1.2fr 1fr .8fr .6fr; gap: 8px; padding: 10px; background: #fff; }
+    .graph-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(180px, .8fr); gap: 12px; margin-top: 16px; }
+    .graph { position: relative; min-height: 390px; padding: 24px; overflow: hidden; }
+    .node { position: absolute; width: 126px; padding: 10px; border: 2px solid #555; background: #fff; }
+    .node:nth-child(1) { top: 30px; left: calc(50% - 63px); }
+    .node:nth-child(2) { top: 155px; left: 28px; }
+    .node:nth-child(3) { top: 155px; right: 28px; }
+    .node:nth-child(4) { bottom: 32px; left: calc(50% - 63px); }
+    .inspector { min-height: 390px; padding: 12px; }
+    .timeline { margin-top: 20px; border-left: 2px solid #555; padding-left: 20px; }
+    .event { position: relative; min-height: 90px; margin-bottom: 18px; padding: 12px; border: 1px solid #888; }
+    .event::before { content: ""; position: absolute; width: 10px; height: 10px; left: -27px; top: 18px; border: 2px solid #333; background: #fff; border-radius: 50%; }
+    .annotations { margin: 16px 0 0; padding-left: 20px; color: #444; }
+    .recommended { border-color: #333; box-shadow: 6px 6px 0 #aaa; }
+    @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } .variation > p { min-height: 0; } }
+  </style>
+</head>
+<body>
+  <h1>Faultspan case-workspace directions</h1>
+  <p class="intro">Axis: how a reviewer understands responsibility—through a familiar ledger, a causal graph, or an event narrative. Greyscale is intentional; visual styling comes after the information model is chosen.</p>
+  <main class="grid">
+    <article class="variation">
+      <h2>01 — Case ledger</h2>
+      <p>Safe and dense. The case reads like a financial operations table with graph details available on demand.</p>
+      <div class="screen">
+        <div class="topbar"><strong>FAULTSPAN</strong><span>STUDIONET · 0x71…09A</span></div>
+        <div class="shell"><aside class="nav"><div></div><div></div><div></div></aside><section class="main">
+          <div class="bar short"></div><div class="bar"></div>
+          <div class="stats"><div class="box"></div><div class="box"></div><div class="box"></div></div>
+          <div class="table"><div class="row"><b>OBLIGATION</b><b>PROVIDER</b><b>BOND</b><b>STATE</b></div><div class="row"><span>Root report</span><span>Coordinator</span><span>4 GEN</span><span>open</span></div><div class="row"><span>Source research</span><span>Agent Atlas</span><span>2 GEN</span><span>pass</span></div><div class="row"><span>Validate analysis</span><span>Agent Kepler</span><span>3 GEN</span><span>fail</span></div><div class="row"><span>Final writing</span><span>Agent Scribe</span><span>2 GEN</span><span>pass</span></div></div>
+        </section></div>
+      </div>
+      <ul class="annotations"><li>Fastest for operations users.</li><li>Weakest expression of multi-hop causality.</li><li>Best mobile/accessibility fallback.</li></ul>
+    </article>
+
+    <article class="variation recommended">
+      <h2>02 — Evidence graph · recommended</h2>
+      <p>The obligation topology is primary. Selection opens a persistent evidence and economic inspector.</p>
+      <div class="screen">
+        <div class="topbar"><strong>FAULTSPAN</strong><span>STUDIONET · 0x71…09A</span></div>
+        <div class="shell"><aside class="nav"><div></div><div></div><div></div></aside><section class="main">
+          <div class="bar short"></div><div class="bar"></div>
+          <div class="graph-layout"><div class="graph box"><div class="node">ROOT<br><small>Coordinator</small></div><div class="node">RESEARCH<br><small>Complied</small></div><div class="node">ANALYSIS<br><small>Caused failure</small></div><div class="node">WRITING<br><small>Complied</small></div></div><aside class="inspector box"><b>ANALYSIS</b><hr><div class="bar"></div><div class="bar short"></div><br><b>EVIDENCE</b><hr><div class="bar"></div><div class="bar"></div><br><b>BOND</b><hr><div class="bar short"></div></aside></div>
+        </section></div>
+      </div>
+      <ul class="annotations"><li>Makes the unique mechanism visible immediately.</li><li>Inspector keeps evidence next to consequences.</li><li>Requires a non-graph alternate representation.</li></ul>
+    </article>
+
+    <article class="variation">
+      <h2>03 — Adjudication room</h2>
+      <p>Bold and narrative. The case unfolds as a chronological hearing with the verdict as the final event.</p>
+      <div class="screen">
+        <div class="topbar"><strong>FAULTSPAN / CASE 042</strong><span>DISPUTED</span></div>
+        <section class="main">
+          <div class="bar short"></div><div class="bar"></div>
+          <div class="timeline"><div class="event"><b>01 · COMMITMENT</b><div class="bar"></div><div class="bar short"></div></div><div class="event"><b>02 · DELEGATION</b><div class="bar"></div><div class="bar"></div></div><div class="event"><b>03 · FAILURE</b><div class="bar short"></div><div class="bar"></div></div><div class="event"><b>04 · VERDICT</b><div class="bar"></div><div class="bar short"></div></div></div>
+        </section>
+      </div>
+      <ul class="annotations"><li>Strongest for a guided pitch.</li><li>Slower for expert case comparison.</li><li>Useful later as a public case replay.</li></ul>
+    </article>
+  </main>
+</body>
+</html>
+

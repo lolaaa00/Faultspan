@@ -1,0 +1,32 @@
+{
+  "name": "@faultspan/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "start": "next start",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@faultspan/domain": "*",
+    "@fontsource-variable/ibm-plex-sans": "latest",
+    "@fontsource/ibm-plex-mono": "latest",
+    "genlayer-js": "1.1.8",
+    "lucide-react": "latest",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

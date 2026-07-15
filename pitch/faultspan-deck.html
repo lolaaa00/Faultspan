@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faultspan — GenLayer accelerator deck</title>
+  <!--
+    Layout system: 1920×1080 fixed slide canvas.
+    Types: cover, statement, graph, sequence, architecture, proof, closing.
+    Backgrounds: mineral paper and charcoal only; cyan is an action/logic accent.
+    Headlines: 76–118px. Body: 30–38px. Footer: slide counter only.
+    Navigation: arrow keys, Space, Home/End, click zones. Print: one slide per page.
+  -->
+  <style>
+    @font-face { font-family: Plex; src: local("IBM Plex Sans"); }
+    @font-face { font-family: Plex Mono; src: local("IBM Plex Mono"); }
+    :root { --ink:#182126; --paper:#f6f3e9; --muted:#5d6a70; --line:#cbd1cf; --cyan:#087f9d; --red:#a93832; --green:#227251; --amber:#96631b; }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; color:var(--ink); background:#11181c; font-family:Plex,"Segoe UI",sans-serif; }
+    #stage { position:absolute; left:50%; top:50%; width:1920px; height:1080px; transform-origin:center; }
+    #deck { width:100%; height:100%; }
+    .slide { position:absolute; inset:0; display:none; overflow:hidden; padding:92px 104px; background:var(--paper); }
+    .slide.active { display:flex; }
+    .slide.dark { color:var(--paper); background:var(--ink); }
+    .slide::after { content:attr(data-number); position:absolute; right:54px; bottom:40px; font:24px Plex Mono,monospace; color:var(--muted); }
+    .dark::after { color:#90a0a5; }
+    h1,h2,p { margin-top:0; }
+    h1 { max-width:1450px; margin-bottom:44px; font-size:118px; line-height:.96; letter-spacing:-.055em; }
+    h2 { max-width:1450px; margin-bottom:52px; font-size:80px; line-height:1.02; letter-spacing:-.04em; }
+    p,li { font-size:34px; line-height:1.45; }
+    .kicker { display:flex; align-items:center; gap:16px; margin-bottom:70px; font:600 24px Plex Mono,monospace; color:var(--cyan); letter-spacing:.12em; text-transform:uppercase; }
+    .kicker::before { content:"F/"; display:grid; width:54px; height:54px; place-items:center; color:var(--paper); background:var(--ink); }
+    .dark .kicker::before { color:var(--ink); background:var(--paper); }
+    .lede { max-width:1160px; color:var(--muted); font-size:42px; }
+    .dark .lede { color:#b9c4c6; }
+    .accent { color:var(--cyan); }
+    .rule { width:180px; height:8px; margin:8px 0 44px; background:var(--cyan); }
+    .cover { flex-direction:column; justify-content:center; }
+    .cover .network { position:absolute; top:92px; right:104px; font:26px Plex Mono,monospace; color:#aeb9bb; }
+    .cover .tag { margin-top:44px; font:26px Plex Mono,monospace; color:#aeb9bb; }
+    .statement { align-items:center; }
+    .statement blockquote { max-width:1550px; margin:0; font-size:96px; font-weight:600; line-height:1.08; letter-spacing:-.045em; }
+    .statement blockquote span { color:var(--cyan); }
+    .stack { display:grid; width:100%; grid-template-columns:repeat(4,1fr); gap:18px; align-items:end; }
+    .layer { min-height:360px; padding:34px; border:2px solid var(--line); }
+    .layer b { display:block; margin-bottom:16px; font:600 28px Plex Mono,monospace; }
+    .layer p { color:var(--muted); font-size:28px; }
+    .layer.missing { color:var(--paper); background:var(--ink); border-color:var(--ink); transform:translateY(-42px); }
+    .layer.missing p { color:#c1ccce; }
+    .graph-layout { display:grid; width:100%; grid-template-columns:1.15fr .85fr; gap:70px; }
+    .graph { position:relative; min-height:650px; border:2px solid var(--line); background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px); background-size:48px 48px; }
+    .node { position:absolute; width:330px; padding:24px; background:var(--paper); border:3px solid var(--ink); }
+    .node small { display:block; margin-top:12px; font:22px Plex Mono,monospace; color:var(--muted); }
+    .node.root { left:280px; top:42px; }
+    .node.research { left:45px; top:310px; }
+    .node.analysis { right:45px; top:310px; border-color:var(--red); }
+    .graph-notes { display:flex; flex-direction:column; justify-content:center; }
+    .finding { margin:12px 0; padding:24px; border-left:7px solid; font-size:30px; }
+    .finding.pass { border-color:var(--green); }
+    .finding.fail { border-color:var(--red); }
+    .flow { display:grid; width:100%; grid-template-columns:repeat(5,1fr); gap:16px; align-items:center; }
+    .step { min-height:300px; padding:28px; border:2px solid var(--line); }
+    .step em { font:700 54px Plex Mono,monospace; color:var(--cyan); font-style:normal; }
+    .step h3 { margin:32px 0 16px; font-size:34px; }
+    .step p { color:var(--muted); font-size:26px; }
+    .schema { display:grid; width:100%; grid-template-columns:.9fr 1.1fr; gap:74px; align-items:center; }
+    pre { margin:0; padding:42px; color:#dce5e5; background:var(--ink); font:27px/1.55 Plex Mono,monospace; white-space:pre-wrap; }
+    .principles { display:grid; gap:18px; }
+    .principles div { padding:24px 0; border-bottom:2px solid var(--line); font-size:32px; }
+    .architecture { display:grid; width:100%; grid-template-columns:1fr 1fr 1fr; gap:28px; }
+    .architecture section { min-height:420px; padding:34px; border:2px solid var(--line); }
+    .architecture h3 { margin:0 0 26px; font-size:38px; }
+    .architecture p { color:var(--muted); font-size:27px; }
+    .proof-grid { display:grid; width:100%; grid-template-columns:repeat(3,1fr); gap:22px; }
+    .proof { min-height:300px; padding:32px; border:2px solid var(--line); }
+    .proof strong { display:block; margin-bottom:18px; font-size:42px; }
+    .proof p { color:var(--muted); font-size:28px; }
+    .close { flex-direction:column; justify-content:center; }
+    .close h2 { font-size:104px; }
+    .close .ask { margin-top:44px; font:30px Plex Mono,monospace; color:#b9c4c6; }
+    #counter { position:fixed; z-index:10; right:20px; bottom:16px; color:#d8e0e1; font:13px Plex Mono,monospace; }
+    .nav-zone { position:fixed; z-index:8; top:0; bottom:0; width:15vw; border:0; opacity:0; cursor:pointer; }
+    #prev { left:0; } #next { right:0; }
+    @media print { html,body { overflow:visible; background:transparent; } #stage { position:static; transform:none!important; } .slide { position:relative; display:flex!important; page-break-after:always; } #counter,.nav-zone { display:none; } }
+  </style>
+</head>
+<body>
+  <div id="stage"><main id="deck">
+    <section class="slide dark cover active" data-number="01" data-screen-label="01 Title"><span class="network">GENLAYER × DENARII LABS</span><div class="kicker">Faultspan</div><h1>When agents disagree, find the <span class="accent">failed obligation.</span></h1><p class="lede">Failure attribution and automatic recovery for multi-agent commerce.</p><span class="tag">Studionet · genlayer-js 1.1.8 · Python Intelligent Contract</span></section>
+    <section class="slide dark statement" data-number="02" data-screen-label="02 Problem"><blockquote>Payments move at machine speed. Disputes still collapse into <span>“who failed?”</span></blockquote></section>
+    <section class="slide" data-number="03" data-screen-label="03 Missing layer"><div style="width:100%"><div class="kicker">The agentic commerce stack</div><h2>Three layers ship the happy path. One resolves failure.</h2><div class="stack"><div class="layer"><b>x402</b><p>Payment rails for agent transactions.</p></div><div class="layer"><b>ERC-8004</b><p>Identity and reputation.</p></div><div class="layer"><b>A2A</b><p>Agent-to-agent task exchange.</p></div><div class="layer missing"><b>FAULTSPAN / GENLAYER</b><p>Attribution across contested obligations.</p></div></div></div></section>
+    <section class="slide" data-number="04" data-screen-label="04 Liability graph"><div class="graph-layout"><div><div class="kicker">The mechanism</div><h2>Every delegation becomes an obligation span.</h2><div class="graph"><div class="node root"><b>ROOT REPORT</b><small>Coordinator · 4 GEN</small></div><div class="node research"><b>SOURCE RESEARCH</b><small>COMPLIED · 2 GEN</small></div><div class="node analysis"><b>ANALYSIS VALIDATION</b><small>CAUSED FAILURE · 3 GEN</small></div></div></div><div class="graph-notes"><div class="finding pass">Research delivered the required source manifest.</div><div class="finding fail">Analysis omitted a mandatory two-source validation.</div><div class="finding pass">Writing followed the supplied analysis.</div></div></div></section>
+    <section class="slide" data-number="05" data-screen-label="05 Flow"><div style="width:100%"><div class="kicker">The product loop</div><h2>Judgment is bounded. Enforcement is deterministic.</h2><div class="flow"><div class="step"><em>01</em><h3>Commit</h3><p>Sign exact obligations and bond rules.</p></div><div class="step"><em>02</em><h3>Delegate</h3><p>Build the liability graph through A2A tasks.</p></div><div class="step"><em>03</em><h3>Dispute</h3><p>Lock content-addressed public evidence.</p></div><div class="step"><em>04</em><h3>Adjudicate</h3><p>GenLayer validators compare findings.</p></div><div class="step"><em>05</em><h3>Recover</h3><p>Release or slash bonds exactly once.</p></div></div></div></section>
+    <section class="slide" data-number="06" data-screen-label="06 Verdict"><div class="schema"><div><div class="kicker">Consensus boundary</div><h2>Models decide labels—not money.</h2><div class="principles"><div>Each span appears exactly once.</div><div>Reasons may differ; decision fields must agree.</div><div>Amounts and recipients come from pre-agreed code.</div></div></div><pre>{
+  "spanId": "analysis",
+  "finding": "CAUSED_FAILURE",
+  "material": true,
+  "basisCodes": [
+    "REQUIRED_VALIDATION_OMITTED"
+  ]
+}</pre></div></section>
+    <section class="slide" data-number="07" data-screen-label="07 Architecture"><div style="width:100%"><div class="kicker">Built through week 11</div><h2>A real vertical slice, with honest boundaries.</h2><div class="architecture"><section><h3>GenLayer contract</h3><p>Case and span state, payable bonds, locked evidence, independent validator execution, settlement conservation, pull withdrawals.</p></section><section><h3>Evidence platform</h3><p>Wallet challenges, content-addressed JSON, bounded uploads, A2A normalization, signed x402 receipt verification.</p></section><section><h3>Forensic interface</h3><p>Wallet flow, transaction finality, graph plus accessible ledger, evidence filing, settlement proof, responsive and tweakable design.</p></section></div></div></section>
+    <section class="slide dark close" data-number="08" data-screen-label="08 Close"><div class="kicker">The ask</div><h2>Fund the adjudication layer agents will need before they can safely trade.</h2><div class="rule"></div><p class="lede">Faultspan makes failure attributable, evidence inspectable, and recovery enforceable.</p><span class="ask">FAULTSPAN · BUILD THE AGENTIC ECONOMY</span></section>
+  </main></div>
+  <button class="nav-zone" id="prev" aria-label="Previous slide"></button><button class="nav-zone" id="next" aria-label="Next slide"></button><div id="counter" aria-live="polite"></div>
+  <script>
+    const slides=[...document.querySelectorAll('.slide')]; let index=0;
+    const counter=document.getElementById('counter'); const stage=document.getElementById('stage');
+    function scale(){const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`;}
+    function show(next){index=Math.max(0,Math.min(slides.length-1,next));slides.forEach((s,i)=>s.classList.toggle('active',i===index));counter.textContent=`${String(index+1).padStart(2,'0')} / ${String(slides.length).padStart(2,'0')}`;localStorage.setItem('faultspan:deck-slide',String(index));}
+    addEventListener('resize',scale);addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(index+1)}if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(index-1)}if(e.key==='Home')show(0);if(e.key==='End')show(slides.length-1)});
+    document.getElementById('prev').onclick=()=>show(index-1);document.getElementById('next').onclick=()=>show(index+1);scale();show(Number(localStorage.getItem('faultspan:deck-slide')||0));
+  </script>
+</body>
+</html>
+

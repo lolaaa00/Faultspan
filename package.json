@@ -1,0 +1,20 @@
+{
+  "name": "faultspan",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @faultspan/web",
+    "build": "npm run build --workspace @faultspan/domain && npm run build --workspace @faultspan/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:domain": "npm run test --workspace @faultspan/domain"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

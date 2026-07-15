@@ -1,0 +1,53 @@
+:root {
+  /* Source: Faultspan Evidentiary Instrument direction, 2026-07-14. */
+  --fs-ink-950: oklch(18% 0.016 238);
+  --fs-ink-900: oklch(23% 0.018 238);
+  --fs-ink-800: oklch(31% 0.02 238);
+  --fs-ink-700: oklch(40% 0.02 238);
+  --fs-ink-500: oklch(56% 0.018 238);
+  --fs-ink-300: oklch(75% 0.014 238);
+  --fs-ink-200: oklch(84% 0.012 238);
+  --fs-ink-100: oklch(92% 0.009 238);
+  --fs-paper-50: oklch(98% 0.008 92);
+  --fs-paper-100: oklch(96% 0.011 92);
+  --fs-cyan-700: oklch(52% 0.12 215);
+  --fs-cyan-600: oklch(62% 0.14 215);
+  --fs-cyan-300: oklch(82% 0.09 215);
+  --fs-amber-700: oklch(57% 0.13 72);
+  --fs-amber-300: oklch(83% 0.09 82);
+  --fs-red-700: oklch(52% 0.18 27);
+  --fs-red-300: oklch(83% 0.08 27);
+  --fs-green-700: oklch(48% 0.12 158);
+  --fs-green-300: oklch(83% 0.08 158);
+
+  --fs-font-sans: "IBM Plex Sans Variable", sans-serif;
+  --fs-font-mono: "IBM Plex Mono", monospace;
+  --fs-text-xs: 0.75rem;
+  --fs-text-sm: 0.875rem;
+  --fs-text-md: 1rem;
+  --fs-text-lg: 1.25rem;
+  --fs-text-xl: 1.75rem;
+  --fs-text-2xl: 2.5rem;
+  --fs-leading-tight: 1.12;
+  --fs-leading-normal: 1.5;
+
+  --fs-space-1: 0.25rem;
+  --fs-space-2: 0.5rem;
+  --fs-space-3: 0.75rem;
+  --fs-space-4: 1rem;
+  --fs-space-6: 1.5rem;
+  --fs-space-8: 2rem;
+  --fs-space-12: 3rem;
+  --fs-space-16: 4rem;
+
+  --fs-radius-xs: 2px;
+  --fs-radius-sm: 4px;
+  --fs-radius-md: 8px;
+  --fs-shadow-overlay: 0 24px 64px rgb(12 23 31 / 0.2);
+  --fs-motion-fast: 160ms;
+  --fs-motion-normal: 220ms;
+  --fs-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fs-container: 90rem;
+  --fs-breakpoint-mobile: 48rem;
+}
+

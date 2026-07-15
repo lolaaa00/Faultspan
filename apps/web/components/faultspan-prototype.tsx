@@ -1,0 +1,170 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, ArrowUpRight, BookOpen, ChevronRight, CircleDollarSign, FileCheck2, FileText, FileUp, Gavel, LayoutDashboard, LockKeyhole, Network, Plus, Search, ShieldCheck, Split, TerminalSquare } from "lucide-react";
+import { CreateCaseDialog } from "./create-case-dialog";
+import { LiabilityGraph } from "./liability-graph";
+import { TweakPanel, defaultTweaks, type Tweaks } from "./tweak-panel";
+import { WalletButton } from "./wallet-button";
+import { useFaultspanWallet } from "./wallet-provider";
+import { FileEvidenceDialog } from "./file-evidence-dialog";
+import { listCaseProjections, type CaseProjection } from "@/lib/platform-api";
+import { readFaultspanCase, type LoadedFaultspanCase } from "@/lib/faultspan-contract";
+import type { Address, Finding, SpanStatus } from "@faultspan/domain";
+import type { ObligationSpanView } from "./liability-graph";
+
+type Tab = "evidence" | "settlement" | "activity";
+type View = "overview" | "cases" | "obligations" | "evidence" | "docs";
+
+const nav = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "cases", label: "Cases", icon: Gavel },
+  { id: "obligations", label: "Obligations", icon: Network },
+  { id: "evidence", label: "Evidence", icon: FileCheck2 },
+  { id: "docs", label: "Integration", icon: BookOpen }
+] satisfies { id: View; label: string; icon: typeof LayoutDashboard }[];
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
+}
+
+function shortAddress(value?: string) {
+  if (!value) return "unknown";
+  return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
+}
+
+function toFinding(value?: string): Finding {
+  if (value === "COMPLIED" || value === "CONTRIBUTED_TO_FAILURE" || value === "CAUSED_FAILURE" || value === "INSUFFICIENT_EVIDENCE") return value;
+  return "INSUFFICIENT_EVIDENCE";
+}
+
+function toSpanStatus(value?: string): SpanStatus {
+  if (value === "PROPOSED" || value === "BONDED" || value === "DELIVERED" || value === "ACCEPTED" || value === "DISPUTED") return value;
+  return "PROPOSED";
+}
+
+function toViewSpans(loaded: LoadedFaultspanCase | null): ObligationSpanView[] {
+  if (!loaded) return [];
+  const points = [
+    { x: 50, y: 13 },
+    { x: 22, y: 36 },
+    { x: 50, y: 36 },
+    { x: 78, y: 36 },
+    { x: 22, y: 62 },
+    { x: 50, y: 62 },
+    { x: 78, y: 62 },
+    { x: 50, y: 78 }
+  ];
+  return loaded.spans.map(({ spanId, record }, index) => ({
+    id: spanId,
+    parentId: record.parent_id || null,
+    label: spanId,
+    provider: shortAddress(record.provider),
+    address: (record.provider || "0x0000000000000000000000000000000000000000") as Address,
+    obligation: String(record.explanation || record.evidence_refs || "Contract span loaded from Studionet"),
+    bond: `${String(record.bond_posted ?? record.bond_required ?? 0n)} wei`,
+    status: toSpanStatus(record.status),
+    finding: toFinding(record.finding),
+    evidenceCount: record.evidence_refs ? 1 : 0,
+    x: points[index]?.x ?? 50,
+    y: points[index]?.y ?? 50,
+    evidence: record.evidence_refs ? [{ label: "Contract evidence", digest: record.evidence_refs, kind: "manifest" }] : []
+  }));
+}
+
+export function FaultspanPrototype({ initialView = "overview" }: { initialView?: View }) {
+  const [loadedCase, setLoadedCase] = useState<LoadedFaultspanCase | null>(null);
+  const spans = useMemo(() => toViewSpans(loadedCase), [loadedCase]);
+  const [selectedId, setSelectedId] = useState("");
+  const [tab, setTab] = useState<Tab>("evidence");
+  const [view, setView] = useState<View>(initialView);
+  const [caseQuery, setCaseQuery] = useState("");
+  const [caseList, setCaseList] = useState<CaseProjection[]>([]);
+  const [caseSearchError, setCaseSearchError] = useState<string | null>(null);
+  const [caseLoading, setCaseLoading] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [tweaks, setTweaks] = useState<Tweaks>(defaultTweaks);
+  const updateTweaks = useCallback((value: Tweaks) => setTweaks(value), []);
+  const { tx } = useFaultspanWallet();
+  const selectedSpan = spans.find((span) => span.id === selectedId);
+
+  const openCaseBuilder = () => { setView("cases"); setCreateOpen(true); };
+  const openEvidenceBuilder = () => { setView("evidence"); setEvidenceOpen(true); };
+  const refreshCases = useCallback(async (query = caseQuery) => {
+    setCaseSearchError(null);
+    try {
+      setCaseList(await listCaseProjections(query));
+    } catch (error) {
+      setCaseSearchError(error instanceof Error ? error.message : "Case search failed");
+    }
+  }, [caseQuery]);
+  const loadCase = useCallback(async (caseId: string) => {
+    setCaseLoading(true);
+    setCaseSearchError(null);
+    try {
+      const loaded = await readFaultspanCase(caseId);
+      setLoadedCase(loaded);
+      setSelectedId(loaded.spanIds[0] ?? "");
+      setView("cases");
+    } catch (error) {
+      setCaseSearchError(error instanceof Error ? error.message : "Contract read failed");
+    } finally {
+      setCaseLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void refreshCases(""); }, [refreshCases]);
+
+  return (
+    <div className="prototype-root" data-tone={tweaks.tone} data-density={tweaks.density} style={{ "--tweak-primary": tweaks.hue } as React.CSSProperties}>
+      <a className="skip-link" href="#case-workspace">Skip to workspace</a>
+      <aside className="sidebar" aria-label="Primary navigation">
+        <button className="brand brand-button" onClick={() => setView("overview")} aria-label="Faultspan overview"><span>F/</span><strong>FAULTSPAN</strong></button>
+        <nav>
+          {nav.map((item) => {
+            const Icon = item.icon;
+            return <button key={item.id} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => setView(item.id)}><Icon aria-hidden="true" />{item.label}</button>;
+          })}
+        </nav>
+        <div className="sidebar-foot"><span className="network-light" aria-hidden="true"></span><div><strong>Studionet</strong><small>Chain 61999</small></div></div>
+      </aside>
+
+      <div className="app-column">
+        <header className="topbar">
+          <form className="search" onSubmit={(event) => { event.preventDefault(); setView("cases"); void refreshCases(caseQuery); }}><Search aria-hidden="true" size={16} /><input aria-label="Search cases" placeholder="Search real cases, agents, tx hashes" value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} /></form>
+          <div className="topbar-actions"><span className="network-chip"><span aria-hidden="true"></span>Studionet</span><WalletButton /></div>
+        </header>
+
+        <main id="case-workspace">
+          {tx.phase !== "IDLE" && <div className={`tx-banner tx-${tx.phase.toLowerCase()}`} role="status"><span className="tx-pulse" aria-hidden="true"></span><div><strong>{tx.phase === "SUBMITTING" ? "Studionet transaction pending" : tx.phase === "ACCEPTED" ? "Accepted by the network" : tx.phase === "FINALIZED" ? "Transaction finalized" : "Transaction failed"}</strong><small>{tx.message}{tx.hash ? ` - ${tx.hash.slice(0, 12)}...${tx.hash.slice(-8)}` : ""}</small></div></div>}
+
+          {view === "overview" && <section className="landing-panel" aria-labelledby="landing-title">
+            <div className="landing-copy"><span className="eyebrow">Agentic dispute resolution</span><h1 id="landing-title">Faultspan</h1><p>Attribute failures across multi-agent commerce, preserve public evidence in Supabase, and submit adjudication flows to the GenLayer Studionet contract.</p><div className="landing-actions"><button className="button button-primary" onClick={openCaseBuilder}><Plus aria-hidden="true" size={16} />Create real case</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Submit evidence</button></div></div>
+            <div className="landing-instrument" aria-label="Live configuration"><div><span>Contract</span><strong className="mono">0x1c3c...86eb</strong></div><div><span>RPC</span><strong>studio.genlayer.com/api</strong></div><div><span>Storage</span><strong>Supabase private bucket</strong></div></div>
+          </section>}
+
+          {view === "cases" && <>
+            <div className="case-breadcrumb"><button onClick={() => setView("overview")}>Overview</button><ChevronRight aria-hidden="true" size={14} /><span>Cases</span></div>
+            <section className="case-heading" aria-labelledby="case-title"><div><div className="eyebrow-row"><span className="eyebrow">Real Studionet mode</span><span className="status status-disputed"><Gavel aria-hidden="true" size={13} />Live contract</span></div><h1 id="case-title">{loadedCase ? loadedCase.caseId : "No synthetic case loaded"}</h1><p>{loadedCase ? `Loaded from get_case/get_case_span_ids/get_span. Current status: ${loadedCase.caseRecord.status || "unknown"}.` : "Create a case against the configured Studionet contract or query a real case id. This workspace no longer seeds demo disputes."}</p></div><div className="case-actions"><button className="button button-secondary"><FileText aria-hidden="true" size={16} />Export record</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Add evidence</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" size={16} />New case</button></div></section>
+            <section className="case-search-panel" aria-label="Search and load cases"><form className="case-search-row" onSubmit={(event) => { event.preventDefault(); void refreshCases(caseQuery); }}><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Search indexed cases or paste a case id" aria-label="Case search or case id" /><button className="button button-secondary" type="submit"><Search aria-hidden="true" size={16} />Search</button><button className="button button-primary" type="button" disabled={!caseQuery.trim() || caseLoading} onClick={() => void loadCase(caseQuery.trim())}>{caseLoading ? "Loading..." : "Load from contract"}</button></form>{caseSearchError && <p className="form-error">{caseSearchError}</p>}<div className="case-list">{caseList.map((item) => <button key={item.case_id} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.case_id} · {item.status} · {item.tx_hash ?? "no tx hash indexed"}</small></span><ChevronRight aria-hidden="true" size={16} /></button>)}</div></section>
+            <section className="case-facts" aria-label="Case facts"><Metric label="Bonded value" value={`${String(loadedCase?.caseRecord.totalBonded ?? 0n)} wei`} detail={loadedCase ? "From get_case" : "Awaiting real case"} /><Metric label="Evidence" value={`${loadedCase?.caseRecord.evidence_manifest?.split("\n").filter(Boolean).length ?? 0} refs`} detail={loadedCase ? "Manifest entries" : "No manifest loaded"} /><Metric label="Current phase" value={loadedCase?.caseRecord.status || "Not loaded"} detail="Studionet accepted state" /><Metric label="Potential recovery" value={`${String(loadedCase?.caseRecord.totalSlashed ?? 0n)} wei`} detail="After adjudication/settlement" /></section>
+            <div className="workspace-grid"><section className="workspace-panel graph-panel" aria-labelledby="graph-title"><header className="panel-head"><div><span className="eyebrow">Liability topology</span><h2 id="graph-title">Obligation graph</h2></div><div className="segmented" aria-label="Graph display mode"><button className={tweaks.view === "graph" ? "active" : ""} onClick={() => updateTweaks({ ...tweaks, view: "graph" })}>Graph</button><button className={tweaks.view === "ledger" ? "active" : ""} onClick={() => updateTweaks({ ...tweaks, view: "ledger" })}>Ledger</button></div></header><LiabilityGraph spans={spans} selectedId={selectedId} onSelect={setSelectedId} mode={tweaks.view} /></section><aside className="workspace-panel inspector" aria-labelledby="inspector-title"><header className="panel-head"><div><span className="eyebrow">Selected span</span><h2 id="inspector-title">{selectedSpan?.label ?? "Nothing selected"}</h2></div></header>{selectedSpan ? <><section className="provider-line"><span className="agent-mark">{selectedSpan.provider.slice(0, 1)}</span><div><strong>{selectedSpan.provider}</strong><span>{selectedSpan.address}</span></div></section><section className="inspector-section"><h3>Contract status</h3><p>{selectedSpan.status} · finding {selectedSpan.finding}</p></section><section className="inspector-section"><h3>Evidence</h3><p>{selectedSpan.evidenceCount ? selectedSpan.evidence[0]?.digest : "No evidence refs on this span yet."}</p></section></> : <section className="empty-state"><ShieldCheck aria-hidden="true" /><h3>Real data only</h3><p>No obligation span is loaded from the contract yet. Create a case or query a real case id; no demo findings are shown here.</p></section>}</aside></div>
+            <section className="workspace-panel case-record"><div className="tabs" role="tablist" aria-label="Case record"><button role="tab" aria-selected={tab === "evidence"} onClick={() => setTab("evidence")}><FileCheck2 aria-hidden="true" size={15} />Evidence</button><button role="tab" aria-selected={tab === "settlement"} onClick={() => setTab("settlement")}><CircleDollarSign aria-hidden="true" size={15} />Settlement</button><button role="tab" aria-selected={tab === "activity"} onClick={() => setTab("activity")}><Activity aria-hidden="true" size={15} />Activity</button></div>{tab === "evidence" && <div className="tab-content evidence-summary"><div><LockKeyhole aria-hidden="true" /><span><strong>No manifest loaded</strong><small className="mono">waiting for real evidence</small></span></div><p>Evidence submitted through this app is stored in the configured private Supabase bucket and referenced by content digest. No seeded evidence is displayed.</p><button className="button button-secondary" onClick={openEvidenceBuilder}>Add evidence<ArrowUpRight aria-hidden="true" size={15} /></button></div>}{tab === "settlement" && <div className="tab-content empty-state"><CircleDollarSign aria-hidden="true" /><h3>No settlement computed</h3><p>Settlement rows will stay empty until a real case is adjudicated by the configured Studionet contract.</p></div>}{tab === "activity" && <div className="tab-content empty-state"><Activity aria-hidden="true" /><h3>No activity loaded</h3><p>There is no synthetic timeline. New transactions will appear through the live transaction banner while you test.</p></div>}</section>
+          </>}
+
+          {view === "obligations" && <section className="route-panel" aria-labelledby="obligations-title"><span className="eyebrow">Obligation registry</span><h1 id="obligations-title">Obligations</h1><p>Define the root commitment, delegated spans, provider bonds, and acceptance windows before a dispute starts.</p><div className="route-grid"><article><Network aria-hidden="true" /><h2>Span graph</h2><p>Each delegated task becomes a span with a parent, provider, obligation text, and bond.</p></article><article><Split aria-hidden="true" /><h2>Dependency chain</h2><p>Root outcomes can point to the exact span that caused or contributed to failure.</p></article><article><Gavel aria-hidden="true" /><h2>Adjudication terms</h2><p>Deadlines and recovery rules are set before evidence is locked.</p></article></div><button className="button button-primary" onClick={openCaseBuilder}><Plus aria-hidden="true" size={16} />Create first obligation case</button></section>}
+
+          {view === "evidence" && <section className="route-panel" aria-labelledby="evidence-title"><span className="eyebrow">Supabase evidence vault</span><h1 id="evidence-title">Evidence</h1><p>Submit public, signed evidence bundles to the private Supabase bucket and reference them by digest for GenLayer adjudication.</p><div className="route-grid"><article><LockKeyhole aria-hidden="true" /><h2>Private bucket</h2><p>Objects are stored under content-addressed paths and served through the backend evidence endpoint.</p></article><article><FileCheck2 aria-hidden="true" /><h2>Wallet signed</h2><p>The backend issues a challenge, verifies the wallet signature, then accepts the evidence bundle.</p></article><article><FileUp aria-hidden="true" /><h2>Case scoped</h2><p>Every bundle needs a real case id, span id, obligation text, and statement.</p></article></div><button className="button button-primary" onClick={() => setEvidenceOpen(true)}><FileUp aria-hidden="true" size={16} />Add evidence</button></section>}
+
+          {view === "docs" && <section className="route-panel" aria-labelledby="docs-title"><span className="eyebrow">Integration guide</span><h1 id="docs-title">Integration</h1><p>Runtime is locked to Studionet, GenLayer JS 1.1.8, and the deployed Faultspan contract.</p><div className="docs-list"><div><TerminalSquare aria-hidden="true" /><span>RPC</span><code>https://studio.genlayer.com/api</code></div><div><TerminalSquare aria-hidden="true" /><span>Chain ID</span><code>61999 / 0xf22f</code></div><div><TerminalSquare aria-hidden="true" /><span>Contract</span><code>0x1c3cdE1FdB758971F0F2D06BafBdd194ca9d86eb</code></div><div><TerminalSquare aria-hidden="true" /><span>Storage</span><code>SUPABASE_EVIDENCE_BUCKET=faultspan-evidence</code></div></div></section>}
+
+          <footer className="prototype-footer"><span>Faultspan real-mode build</span><span>RPC <code>studio.genlayer.com/api</code> - SDK <code>genlayer-js@1.1.8</code></span></footer>
+        </main>
+      </div>
+      <TweakPanel value={tweaks} onChange={updateTweaks} />
+      <CreateCaseDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <FileEvidenceDialog open={evidenceOpen} onClose={() => setEvidenceOpen(false)} />
+    </div>
+  );
+}
