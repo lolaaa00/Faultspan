@@ -89,7 +89,7 @@ def test_case_projection_requires_owner_session_and_is_searchable(tmp_path: Path
         "title": "Weather SLA claim",
         "owner": owner.address,
         "coordinator": owner.address,
-        "contract_address": "0x1c3cdE1FdB758971F0F2D06BafBdd194ca9d86eb",
+        "contract_address": "0x23B6F12322d811918c4Ca5De210529d6cB09Df5D",
         "tx_hash": "0xabc123",
         "status": "OPEN",
     }
@@ -121,7 +121,7 @@ def test_span_activity_and_search_projections_are_queryable(tmp_path: Path):
         "title": "Agent report dispute",
         "owner": owner.address,
         "coordinator": owner.address,
-        "contract_address": "0x1c3cdE1FdB758971F0F2D06BafBdd194ca9d86eb",
+        "contract_address": "0x23B6F12322d811918c4Ca5De210529d6cB09Df5D",
         "tx_hash": "0xcase003",
         "status": "OPEN",
     }

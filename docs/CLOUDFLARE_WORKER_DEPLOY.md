@@ -26,7 +26,7 @@ Recommended Worker commands:
 Recommended Vercel frontend env:
 
 - `NEXT_PUBLIC_PLATFORM_API_URL=https://faultspan-platform.delealufejoel.workers.dev`
-- `NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x1c3cdE1FdB758971F0F2D06BafBdd194ca9d86eb`
+- `NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x23B6F12322d811918c4Ca5De210529d6cB09Df5D`
 - `NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api`
 - `NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999`
 

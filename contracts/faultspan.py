@@ -97,6 +97,14 @@ class Faultspan(gl.Contract):
         if len(value) < 3 or len(value) > 64 or "|" in value or "::" in value:
             raise gl.vm.UserError(label + " must be 3-64 safe characters")
 
+    def _normalize_address(self, value: typing.Any, label: str) -> Address:
+        if isinstance(value, Address):
+            return value
+        try:
+            return Address(str(value))
+        except Exception as error:
+            raise gl.vm.UserError(label + " must be a valid address") from error
+
     def _require_case_manager(self, case: CaseRecord) -> None:
         sender = gl.message.sender_address
         if sender != case.owner and sender != case.coordinator:
@@ -162,6 +170,7 @@ class Faultspan(gl.Contract):
             raise gl.vm.UserError("evidence deadline must follow delivery deadline")
         if not root_terms_ref or not root_terms_digest:
             raise gl.vm.UserError("root terms reference and digest are required")
+        coordinator = self._normalize_address(coordinator, "coordinator")
 
         self.cases[case_id] = CaseRecord(
             owner=gl.message.sender_address,
@@ -213,6 +222,8 @@ class Faultspan(gl.Contract):
             raise gl.vm.UserError("contribution penalty cannot exceed causal penalty")
         if int(causal_penalty_bps) > BPS:
             raise gl.vm.UserError("penalty cannot exceed 10000 bps")
+        requester = self._normalize_address(requester, "requester")
+        provider = self._normalize_address(provider, "provider")
 
         existing_ids = self._span_ids(case_id)
         if len(existing_ids) == 0:

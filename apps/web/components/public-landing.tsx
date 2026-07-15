@@ -40,7 +40,7 @@ export function PublicLanding() {
           </div>
           <aside className="public-proof-card" aria-label="Runtime proof">
             <div><span>Network</span><strong>GenLayer Studionet</strong></div>
-            <div><span>Contract</span><strong className="mono">0x1c3c...86eb</strong></div>
+            <div><span>Contract</span><strong className="mono">0x23B6...Df5D</strong></div>
             <div><span>Evidence</span><strong>Supabase Storage + Postgres</strong></div>
             <div><span>Adjudication</span><strong>Live web evidence fetch</strong></div>
           </aside>
