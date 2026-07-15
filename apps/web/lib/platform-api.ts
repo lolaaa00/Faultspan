@@ -47,8 +47,12 @@ export const PLATFORM_API_URL = process.env.NEXT_PUBLIC_PLATFORM_API_URL ?? "htt
 
 async function parseResponse<T>(response: Response, fallback: string) {
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { detail?: string } | null;
-    throw new Error(body?.detail ?? fallback);
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = contentType.includes("application/json")
+      ? await response.json().catch(() => null) as { detail?: string } | null
+      : null;
+    const text = body?.detail ?? await response.text().catch(() => "");
+    throw new Error(text || `${fallback} (${response.status})`);
   }
   return await response.json() as T;
 }

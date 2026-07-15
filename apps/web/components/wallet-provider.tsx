@@ -35,7 +35,7 @@ type WalletContextValue = {
   connect(): Promise<void>;
   disconnect(): void;
   createCase(input: CaseInput): Promise<{ onchain: boolean; caseId: string }>;
-  submitEvidence(input: EvidenceInput): Promise<{ evidenceId: string; digest: string; publicPath: string }>;
+  submitEvidence(input: EvidenceInput): Promise<{ evidenceId: string; digest: string; publicPath: string; byteLength?: number }>;
   registerSpan(input: RegisterSpanInput): Promise<{ hash: string }>;
   acceptSpan(input: AcceptSpanInput): Promise<{ hash: string }>;
   submitDelivery(input: DeliveryInput): Promise<{ hash: string; deliveryDigest: string }>;
@@ -307,8 +307,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const body = await evidenceResponse.json().catch(() => null) as { detail?: string } | null;
       throw new Error(body?.detail ?? "Evidence upload failed");
     }
-    const receipt = await evidenceResponse.json() as { evidence_id: string; digest: string; public_path: string };
-    return { evidenceId: receipt.evidence_id, digest: receipt.digest, publicPath: `${PLATFORM_API_URL}${receipt.public_path}` };
+    const receipt = await evidenceResponse.json() as { evidence_id: string; digest: string; public_path: string; byte_length?: number };
+    const result = {
+      evidenceId: receipt.evidence_id,
+      digest: receipt.digest,
+      publicPath: `${PLATFORM_API_URL}${receipt.public_path}`,
+      byteLength: receipt.byte_length
+    };
+    await recordActivity(sessionToken, {
+      case_id: input.caseId,
+      span_id: input.spanId,
+      actor: address,
+      action: "submit_evidence_bundle",
+      status: "STORED",
+      tx_hash: null,
+      summary: `Stored evidence bundle ${receipt.evidence_id} for ${input.spanId}`
+    });
+    return result;
   }, [address]);
 
   const registerSpan = useCallback(async (input: RegisterSpanInput) => {

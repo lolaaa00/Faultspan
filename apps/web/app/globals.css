@@ -191,11 +191,20 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
 .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--primary); }
 .tab-content { min-height: 124px; padding: 20px var(--panel-padding); }
 .evidence-summary { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(300px, 1.5fr) auto; align-items: center; gap: 28px; }
+.evidence-stack { display: grid; gap: 18px; }
 .evidence-summary > div { display: flex; align-items: center; gap: 12px; }
 .evidence-summary > div > span { display: grid; gap: 4px; }
 .evidence-summary svg { color: var(--primary); }
 .evidence-summary small, .evidence-summary p { color: var(--muted); }
 .evidence-summary p { margin: 0; line-height: 1.6; }
+.evidence-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.evidence-card { display: grid; gap: 12px; padding: 18px 0 0; border-top: 1px solid var(--border); }
+.evidence-card p { margin: 0; color: var(--muted); line-height: 1.6; }
+.evidence-refs { display: grid; gap: 8px; }
+.evidence-refs a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; color: var(--text); text-decoration: none; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--fs-radius-sm); }
+.evidence-refs a:hover { border-color: var(--primary); }
+.evidence-refs code { overflow-wrap: anywhere; font-family: var(--fs-font-mono); font-size: var(--fs-text-xs); }
+.activity-list.compact li { min-height: 52px; }
 .settlement-table { display: grid; padding-top: 12px; }
 .settlement-row { display: grid; grid-template-columns: 1.2fr 1fr .6fr .6fr; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--border); font-size: var(--fs-text-sm); }
 .settlement-row.heading { min-height: 36px; font: 600 11px var(--fs-font-mono); color: var(--subtle); text-transform: uppercase; letter-spacing: .08em; }
@@ -280,6 +289,7 @@ main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px
   .case-facts { grid-template-columns: 1fr 1fr; }
   .inspector { display: block; }
   .evidence-summary { grid-template-columns: 1fr; gap: 16px; }
+  .evidence-detail-grid { grid-template-columns: 1fr; }
   .settlement-row { grid-template-columns: 1fr 1fr; padding: 10px 0; }
   .settlement-row span:nth-child(3)::before { content: "Return · "; color: var(--subtle); }
   .settlement-row span:nth-child(4)::before { content: "Slash · "; color: var(--subtle); }
