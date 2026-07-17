@@ -186,18 +186,19 @@ def test_full_case_lifecycle_on_studionet(evidence_digest):
     assert not tx_execution_succeeded(receipt)
 
     # KNOWN ISSUE (see docs/KNOWN_ISSUES.md): on real Studionet execution,
-    # get_claimable (a view over the TreeMap[Address, u256] claimable
-    # ledger) reliably fails with "gen_call failed: execution failed" for
-    # *any* address -- including addresses the contract never wrote to --
-    # once settle_case has performed its first write into that TreeMap.
-    # get_case / get_span (TreeMap[str, ...]) keep working fine against the
-    # same contract after the same settlement, so this is isolated to
-    # Address-keyed TreeMap reads post-write under real GenVM, not to
-    # Faultspan's settlement logic (direct-mode tests, which use a
-    # different in-memory storage backend, do not reproduce it -- see
-    # tests/direct/test_faultspan.py::test_settlement_conserves_bonded_value).
-    # This assertion pins the current (broken) behavior so a genvm/SDK fix
-    # is caught by a change in this test rather than by production surprise.
+    # get_claimable (a view over self.claimable: TreeMap[Address, u256])
+    # reliably fails with "gen_call failed: execution failed" for *any*
+    # address -- including addresses the contract never wrote a claimable
+    # entry for -- once settle_case has performed its first write into
+    # that TreeMap. get_case / get_span (TreeMap[str, ...] of dataclasses)
+    # keep working fine against the same contract after the same
+    # settlement. A TreeMap[str, u256] (keyed by address hex string
+    # instead of Address) reproduces the identical failure, ruling out
+    # "Address keys specifically" as the cause -- the common factor across
+    # both failing shapes is a scalar u256 value type, not the key type.
+    # This assertion pins the current (broken) behavior so an upstream fix
+    # is caught by a change in this test rather than by production
+    # surprise.
     with pytest.raises(Exception, match="execution failed"):
         owner_contract.get_claimable(args=[provider.address]).call()
 
