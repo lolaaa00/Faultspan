@@ -1,0 +1,29 @@
+name: Studionet smoke (controlled)
+
+# Real-network consensus test: deploys a fresh contract to GenLayer
+# Studionet, runs the full case lifecycle through real LLM adjudication,
+# and settles it. Kept out of the per-push `ci.yml` pipeline because it is
+# slow, depends on live Studionet availability, and Studionet resets
+# periodically (see FAULTSPAN_MASTER_PLAN.md section 17). Run it on demand
+# before a release/demo, or on a schedule to catch SDK/network drift early.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Monday 06:00 UTC
+
+jobs:
+  studionet-smoke:
+    name: gltest Studionet integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install contract tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install genlayer-test requests
+      - name: Run Studionet integration test
+        run: gltest tests/integration/ -v -s

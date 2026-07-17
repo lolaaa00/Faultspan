@@ -9,11 +9,11 @@
 **Chain ID:** `61999`  
 **GenLayer client:** `genlayer-js@1.1.8`  
 **Intelligent Contract language:** Python  
-**Last updated:** 2026-07-15
+**Last updated:** 2026-07-17
 
 ---
 
-## 0. Implementation Status Snapshot — 2026-07-15
+## 0. Implementation Status Snapshot — 2026-07-17
 
 ### Completed and demonstrated
 
@@ -29,6 +29,10 @@
 - Deepened the reconciler so it records case-state, span-state, and claimable-balance snapshots independently of app-driven writes.
 - Recorded a live proof run with real tx hashes for dispute, evidence submit, evidence lock, adjudication, settlement, and withdraw.
 - Verified that GenLayer adjudication fetched the evidence URL, digest-checked it, interpreted its content, and returned a semantic result.
+- Added [tests/direct/test_faultspan.py](tests/direct/test_faultspan.py): 27 direct tests covering every category in section 13.1 (role/auth, state-transition, graph cycle, deadline, evidence-lock, verdict-schema, value-conservation, duplicate-settlement, rejected-consensus, insufficient-evidence). `genvm-lint check contracts/faultspan.py --json` and `pytest tests/direct/ -v` both pass cleanly.
+- Added [tests/integration/test_faultspan_studionet.py](tests/integration/test_faultspan_studionet.py): a `gltest` integration test that deploys a fresh contract and runs the full case lifecycle — including real GenLayer leader/validator adjudication and duplicate-settlement rejection — against live Studionet. Passed end to end (confirmed 2026-07-17, run time ~3 minutes).
+- Added `.github/workflows/ci.yml` (frontend typecheck/lint/tests, contract lint + direct tests, backend ruff/pytest, secret scanning, Playwright e2e) and `.github/workflows/studionet-smoke.yml` (on-demand/weekly real-network gate), closing the CI gap from section 15.5.
+- Documented a confirmed GenVM-level defect in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md): `get_claimable` (a view over `TreeMap[Address, u256]`) fails on real Studionet execution for any address once `settle_case` performs its first write into that map, while `get_case`/`get_span` (string-keyed TreeMaps) and the `withdraw()` write transaction itself keep working. The integration test pins this behavior explicitly so a runtime fix is caught automatically.
 
 ### Proven live outcome
 
@@ -48,6 +52,7 @@ This is a valid live proof of web-fetched evidence adjudication, even though it 
 - Execute and record the second live proof run where span-correct evidence produces a stronger causal attribution outcome such as `CAUSED_FAILURE`.
 - Extend current Playwright coverage into a safe wallet-integrated contract-flow harness.
 - Complete hosted production release hardening beyond the current hobby/developer deployment posture.
+- Investigate and, if possible, file upstream the `get_claimable` GenVM defect documented in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md); until resolved, live demos should narrate settlement payouts from span findings rather than calling `get_claimable` on stage.
 
 ---
 
