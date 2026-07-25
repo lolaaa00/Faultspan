@@ -1,5 +1,6 @@
 from eth_account import Account
 from eth_account.messages import encode_defunct
+
 from .evidence import canonical_json
 from .models import X402Receipt, X402Verification
 

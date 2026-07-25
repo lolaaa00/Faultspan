@@ -11,7 +11,7 @@ export default defineConfig({
     trace: "retain-on-failure"
   },
   webServer: {
-    command: "npm.cmd run dev --workspace @faultspan/web",
+    command: "npm run dev --workspace @faultspan/web",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: true,
     timeout: 120_000

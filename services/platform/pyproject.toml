@@ -32,3 +32,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
+
+[tool.ruff.lint]
+# B008: FastAPI's Depends() in function defaults is the canonical pattern
+# BLE001: eth_account and supabase raise opaque exceptions; catching broadly is intentional
+# FURB166: int(addr[2:], 16) is clearer than int(addr, 0) for hex address validation
+ignore = ["B008", "BLE001", "FURB166"]

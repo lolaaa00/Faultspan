@@ -1,9 +1,11 @@
+import json
 from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
-import json
+
 import httpx
 from supabase import Client, create_client
+
 from .models import EvidenceBundle, EvidenceReceipt
 
 _PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files"
@@ -130,7 +132,7 @@ class PinataEvidenceStore:
             return {}
         try:
             return json.loads(self.index_path.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, json.JSONDecodeError, ValueError):
             return {}
 
     def _save_index(self, index: dict[str, str]) -> None:

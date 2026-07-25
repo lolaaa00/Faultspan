@@ -1,5 +1,6 @@
-from hashlib import sha256
 import re
+from hashlib import sha256
+
 from .evidence import canonical_json
 from .models import A2ATask, NormalizedA2ASpan
 

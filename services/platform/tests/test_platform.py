@@ -1,8 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from fastapi.testclient import TestClient
+
 from faultspan_platform.config import Settings
 from faultspan_platform.main import create_app
 from faultspan_platform.models import X402Receipt
@@ -29,7 +31,7 @@ def sample_bundle(address: str) -> dict:
         "case_id": "market-report-01",
         "span_id": "analysis-agent",
         "submitted_by": address,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "obligation": {"text": "Validate every source before drawing conclusions"},
         "delivery": {"status": "failed", "artifact": "report.json"},
         "task_events": [],

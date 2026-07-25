@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from secrets import token_urlsafe
 from time import time
+
 from eth_account import Account
 from eth_account.messages import encode_defunct
 

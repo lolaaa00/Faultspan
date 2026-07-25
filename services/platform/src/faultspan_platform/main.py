@@ -1,5 +1,9 @@
+from time import time
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+
+from .a2a import normalize_task
 from .config import Settings
 from .evidence import create_evidence_store
 from .models import (
@@ -8,24 +12,22 @@ from .models import (
     ActivityRecordOut,
     CaseProjectionIn,
     CaseProjectionOut,
-    NormalizedA2ASpan,
-    SearchResult,
-    SpanProjectionIn,
-    SpanProjectionOut,
     ChallengeRequest,
     ChallengeResponse,
     EvidenceBundle,
     EvidenceReceipt,
+    NormalizedA2ASpan,
+    SearchResult,
     SessionResponse,
+    SpanProjectionIn,
+    SpanProjectionOut,
     VerifyRequest,
     X402Receipt,
     X402Verification,
 )
 from .projection import ActivityRecord, CaseProjection, SpanProjection, create_projection_store
-from time import time
 from .security import Session, WalletAuth
 from .x402 import verify_receipt
-from .a2a import normalize_task
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
