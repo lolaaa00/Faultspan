@@ -24,6 +24,6 @@ test("overview exposes verified case and evidence workspace", async ({ page }) =
   await expect(page.getByRole("button", { name: /produce-a-buyer-ready-market-intelligence--mrlgwkai/i })).toBeVisible();
   await page.goto("/evidence");
   await expect(page.getByRole("heading", { name: /^evidence$/i })).toBeVisible();
-  await expect(page.getByText(/supabase evidence vault/i)).toBeVisible();
+  await expect(page.getByText(/ipfs evidence vault/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /add evidence/i })).toBeVisible();
 });
