@@ -38,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.supabase_url,
         settings.supabase_secret_key,
         settings.supabase_evidence_bucket,
+        pinata_jwt=settings.pinata_jwt,
     )
     projection = create_projection_store(
         settings.supabase_url,

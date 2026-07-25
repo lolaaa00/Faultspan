@@ -2,8 +2,12 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
 import json
+import httpx
 from supabase import Client, create_client
 from .models import EvidenceBundle, EvidenceReceipt
+
+_PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files"
+_PINATA_GATEWAY = "https://gateway.pinata.cloud/ipfs"
 
 
 def canonical_json(value: object) -> bytes:
@@ -112,6 +116,83 @@ class SupabaseEvidenceStore:
             raise OSError("Supabase evidence bucket is unavailable") from error
 
 
+class PinataEvidenceStore:
+    def __init__(self, pinata_jwt: str, index_path: Path, max_bytes: int = 256_000):
+        if not pinata_jwt:
+            raise ValueError("PINATA_JWT is required for the pinata storage backend")
+        self.pinata_jwt = pinata_jwt
+        self.index_path = index_path
+        self.max_bytes = max_bytes
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _load_index(self) -> dict[str, str]:
+        if not self.index_path.exists():
+            return {}
+        try:
+            return json.loads(self.index_path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _save_index(self, index: dict[str, str]) -> None:
+        self.index_path.write_text(json.dumps(index, sort_keys=True, indent=2), encoding="utf-8")
+
+    def put(self, bundle: EvidenceBundle) -> EvidenceReceipt:
+        payload = canonical_json(bundle.model_dump(mode="json"))
+        if len(payload) > self.max_bytes:
+            raise ValueError(f"evidence exceeds {self.max_bytes} byte limit")
+        hex_digest = sha256(payload).hexdigest()
+        index = self._load_index()
+        if hex_digest in index:
+            cid = index[hex_digest]
+            return EvidenceReceipt(
+                evidence_id=f"ev_{hex_digest[:24]}",
+                digest=f"sha256:{hex_digest}",
+                public_path=f"{_PINATA_GATEWAY}/{cid}",
+                byte_length=len(payload),
+            )
+        response = httpx.post(
+            _PINATA_UPLOAD_URL,
+            headers={"Authorization": f"Bearer {self.pinata_jwt}"},
+            files={"file": (f"{hex_digest[:16]}.json", payload, "application/json")},
+            data={"name": f"faultspan-{hex_digest[:16]}"},
+            timeout=30,
+        )
+        if not response.is_success:
+            raise ValueError(f"Pinata upload failed: {response.status_code} {response.text[:200]}")
+        cid = response.json()["data"]["cid"]
+        index[hex_digest] = cid
+        self._save_index(index)
+        return EvidenceReceipt(
+            evidence_id=f"ev_{hex_digest[:24]}",
+            digest=f"sha256:{hex_digest}",
+            public_path=f"{_PINATA_GATEWAY}/{cid}",
+            byte_length=len(payload),
+        )
+
+    def get(self, digest: str) -> bytes:
+        validate_digest(digest)
+        index = self._load_index()
+        cid = index.get(digest)
+        if not cid:
+            raise FileNotFoundError(digest)
+        response = httpx.get(f"{_PINATA_GATEWAY}/{cid}", timeout=30, follow_redirects=True)
+        if not response.is_success:
+            raise FileNotFoundError(digest)
+        payload = response.content
+        if sha256(payload).hexdigest() != digest:
+            raise ValueError("fetched evidence failed integrity check")
+        return payload
+
+    def ready(self) -> None:
+        response = httpx.get(
+            "https://api.pinata.cloud/v3/files?limit=1",
+            headers={"Authorization": f"Bearer {self.pinata_jwt}"},
+            timeout=10,
+        )
+        if response.status_code in (401, 403):
+            raise OSError(f"Pinata authentication failed: {response.status_code}")
+
+
 def create_evidence_store(
     backend: str,
     root: Path,
@@ -119,9 +200,14 @@ def create_evidence_store(
     supabase_url: str | None,
     supabase_secret_key: str | None,
     supabase_bucket: str,
+    pinata_jwt: str | None = None,
 ) -> EvidenceStore:
     if backend == "supabase":
         return SupabaseEvidenceStore(
             supabase_url or "", supabase_secret_key or "", supabase_bucket, max_bytes=max_bytes
+        )
+    if backend == "pinata":
+        return PinataEvidenceStore(
+            pinata_jwt or "", index_path=root / "pinata_index.json", max_bytes=max_bytes
         )
     return FilesystemEvidenceStore(root, max_bytes=max_bytes)

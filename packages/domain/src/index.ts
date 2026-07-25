@@ -6,14 +6,12 @@ export type Address = `0x${string}`;
 export type CaseStatus =
   | "OPEN"
   | "ACTIVE"
-  | "COMPLETED"
   | "DISPUTED"
   | "EVIDENCE_LOCKED"
   | "DECIDED"
-  | "UNDETERMINED"
   | "SETTLED";
 
-export type SpanStatus = "PROPOSED" | "BONDED" | "DELIVERED" | "ACCEPTED" | "DISPUTED";
+export type SpanStatus = "PROPOSED" | "BONDED" | "DELIVERED";
 
 export type Finding =
   | "COMPLIED"
@@ -155,12 +153,10 @@ export function calculateSettlement(spans: ObligationSpan[], verdict: CaseVerdic
 export function assertTransition(from: CaseStatus, to: CaseStatus): void {
   const transitions: Record<CaseStatus, CaseStatus[]> = {
     OPEN: ["ACTIVE"],
-    ACTIVE: ["COMPLETED", "DISPUTED"],
-    COMPLETED: ["SETTLED"],
+    ACTIVE: ["DISPUTED"],
     DISPUTED: ["EVIDENCE_LOCKED"],
-    EVIDENCE_LOCKED: ["DECIDED", "UNDETERMINED"],
+    EVIDENCE_LOCKED: ["DECIDED"],
     DECIDED: ["SETTLED"],
-    UNDETERMINED: [],
     SETTLED: []
   };
   if (!transitions[from].includes(to)) throw new Error(`invalid case transition: ${from} -> ${to}`);

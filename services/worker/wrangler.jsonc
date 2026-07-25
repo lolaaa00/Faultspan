@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "faultspan-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-25",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "kv_namespaces": [
+    { "binding": "KV", "id": "REPLACE_AFTER_wrangler_kv_namespace_create" }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "faultspan",
+      "database_id": "REPLACE_AFTER_wrangler_d1_create"
+    }
+  ],
+
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:3000"
+  }
+}

@@ -14,6 +14,7 @@ class Settings:
     supabase_url: str | None = None
     supabase_secret_key: str | None = None
     supabase_evidence_bucket: str = "faultspan-evidence"
+    pinata_jwt: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -23,8 +24,8 @@ class Settings:
             if origin.strip()
         )
         storage_backend = os.getenv("FAULTSPAN_STORAGE_BACKEND", "filesystem").strip().lower()
-        if storage_backend not in {"filesystem", "supabase"}:
-            raise ValueError("FAULTSPAN_STORAGE_BACKEND must be 'filesystem' or 'supabase'")
+        if storage_backend not in {"filesystem", "supabase", "pinata"}:
+            raise ValueError("FAULTSPAN_STORAGE_BACKEND must be 'filesystem', 'supabase', or 'pinata'")
         projection_backend = os.getenv("FAULTSPAN_PROJECTION_BACKEND", "memory").strip().lower()
         if projection_backend not in {"memory", "supabase"}:
             raise ValueError("FAULTSPAN_PROJECTION_BACKEND must be 'memory' or 'supabase'")
@@ -39,4 +40,5 @@ class Settings:
             supabase_url=os.getenv("SUPABASE_URL"),
             supabase_secret_key=secret_key,
             supabase_evidence_bucket=os.getenv("SUPABASE_EVIDENCE_BUCKET", "faultspan-evidence"),
+            pinata_jwt=os.getenv("PINATA_JWT"),
         )

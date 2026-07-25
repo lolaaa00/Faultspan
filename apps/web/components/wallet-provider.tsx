@@ -258,17 +258,41 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const caseId = `${slug(input.title) || "case"}-${Date.now().toString(36)}`;
     if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before creating a case");
     const provider = window.ethereum;
+    const sessionToken = await createPlatformSession(provider, address);
+    const termsResponse = await fetch(`${PLATFORM_API_URL}/v1/evidence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({
+        schema_version: "1",
+        case_id: caseId,
+        span_id: "root-terms",
+        submitted_by: address,
+        created_at: new Date().toISOString(),
+        obligation: { text: input.title },
+        delivery: {},
+        task_events: [],
+        payment_receipts: [],
+        attachments: [],
+        statements: [{
+          text: "COMPLIED requires material fulfillment of the stated obligation within the required timeframe. CAUSED_FAILURE applies when a material breach was a necessary cause of the root outcome failing. CONTRIBUTED_TO_FAILURE applies when a material breach worsened the root outcome but was not the sole cause. INSUFFICIENT_EVIDENCE applies when available evidence cannot support a determination."
+        }]
+      })
+    });
+    if (!termsResponse.ok) throw new Error("Root terms upload failed — check the platform backend is running with Pinata configured");
+    const termsReceipt = await termsResponse.json() as { digest: string; public_path: string };
+    const termsRef = termsReceipt.public_path.startsWith("http")
+      ? termsReceipt.public_path
+      : `${PLATFORM_API_URL}${termsReceipt.public_path}`;
+    const termsDigest = termsReceipt.digest;
     return runWrite("Create case", async (client, contract) => {
       const now = Math.floor(Date.now() / 1000);
-      const digest = await sha256(input.title);
       const hash = await client.writeContract({
         address: contract,
         functionName: "create_case",
-        args: [caseId, input.coordinator, `urn:faultspan:terms:${caseId}`, digest, BigInt(now + 7 * 86_400), BigInt(now + 10 * 86_400)],
+        args: [caseId, input.coordinator, termsRef, termsDigest, BigInt(now + 7 * 86_400), BigInt(now + 10 * 86_400)],
         value: 0n
       }) as TransactionHash;
       await finalizeHash(hash, "Case finalized on Studionet.", { hash });
-      const sessionToken = await createPlatformSession(provider, address);
       await saveCaseProjection({
         case_id: caseId,
         title: input.title,
@@ -311,7 +335,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const result = {
       evidenceId: receipt.evidence_id,
       digest: receipt.digest,
-      publicPath: `${PLATFORM_API_URL}${receipt.public_path}`,
+      publicPath: receipt.public_path.startsWith("http")
+        ? receipt.public_path
+        : `${PLATFORM_API_URL}${receipt.public_path}`,
       byteLength: receipt.byte_length
     };
     await recordActivity(sessionToken, {

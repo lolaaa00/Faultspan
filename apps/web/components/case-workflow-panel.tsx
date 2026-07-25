@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, Gavel, Link2, LockKeyhole, Play, Plus, ReceiptText, Send, Wallet } from "lucide-react";
 import { useFaultspanWallet } from "./wallet-provider";
 
@@ -33,6 +33,9 @@ export function CaseWorkflowPanel({ caseId, owner, coordinator, spanActors, load
   } = useFaultspanWallet();
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const cancelPollingRef = useRef(false);
+
+  useEffect(() => () => { cancelPollingRef.current = true; }, []);
   const [spanId, setSpanId] = useState("root-span");
   const [parentId, setParentId] = useState("");
   const [obligation, setObligation] = useState("Validate all supporting evidence before publishing the final output.");
@@ -53,9 +56,12 @@ export function CaseWorkflowPanel({ caseId, owner, coordinator, spanActors, load
   const canLinkEvidence = Boolean(address && evidenceSpan && (evidenceSpan.provider?.toLowerCase() === address.toLowerCase() || evidenceSpan.requester?.toLowerCase() === address.toLowerCase() || isManager));
 
   async function refreshWithPolling() {
+    cancelPollingRef.current = false;
     await onRefresh();
     for (let attempt = 0; attempt < 7; attempt += 1) {
+      if (cancelPollingRef.current) return;
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      if (cancelPollingRef.current) return;
       await onRefresh();
     }
   }
