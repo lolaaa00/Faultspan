@@ -6,18 +6,18 @@
   "compatibility_flags": ["nodejs_compat"],
 
   "kv_namespaces": [
-    { "binding": "KV", "id": "REPLACE_AFTER_wrangler_kv_namespace_create" }
+    { "binding": "KV", "id": "0588842f24cf4255aafaa76d30602a37" }
   ],
 
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "faultspan",
-      "database_id": "REPLACE_AFTER_wrangler_d1_create"
+      "database_id": "f5a302f1-2828-4bbb-b249-8346528b62ec"
     }
   ],
 
   "vars": {
-    "ALLOWED_ORIGINS": "http://localhost:3000"
+    "ALLOWED_ORIGINS": "http://localhost:3000,https://faultspan-web.vercel.app"
   }
 }
