@@ -311,6 +311,8 @@ You will need to create a local `.dev.vars` file for the secret:
 PINATA_JWT=<your-pinata-jwt>
 ```
 
+> **Never commit `.dev.vars`** — it holds a real secret. It is covered by `.gitignore`.
+
 Worker runs at `http://localhost:8787`.
 
 > Note: `wrangler dev` uses a local in-memory KV and local D1 by default. Run `npm run db:migrate:local` once before using it locally.
