@@ -1,5 +1,0 @@
-{
-  "installCommand": "npm install",
-  "buildCommand": "npm run build --workspace @faultspan/domain && npm run build --workspace @faultspan/web",
-  "outputDirectory": "apps/web/.next"
-}
