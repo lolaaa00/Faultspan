@@ -14,6 +14,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test",
     "test:domain": "npm run test --workspace @faultspan/domain",
+    "verify:schema": "tsx scripts/verify-schema.ts",
     "reconcile:studionet": "tsx scripts/reconcile-studionet.ts",
     "test:studionet:finish": "tsx scripts/studionet-finish-case.ts",
     "test:studionet:second-proof": "tsx scripts/studionet-second-proof.ts"

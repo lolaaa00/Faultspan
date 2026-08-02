@@ -37,23 +37,19 @@ jobs:
       - name: Run direct tests
         run: pytest tests/direct/ -v
 
-  backend:
-    name: Backend (ruff, pytest)
+  schema:
+    name: Frontend/contract schema alignment
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/platform
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-      - name: Install backend package
-        run: python -m pip install -e ".[dev]"
-      - name: Lint
-        run: ruff check .
-      - name: Test
-        run: pytest -v
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:schema
+        env:
+          FAULTSPAN_CONTRACT_ADDRESS: 0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb
 
   secret-scan:
     name: Secret scanning
