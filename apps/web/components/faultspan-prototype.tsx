@@ -32,6 +32,17 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   return <div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
 }
 
+const TX_PHASE_LABELS: Record<string, string> = {
+  SUBMITTING: "Studionet transaction pending",
+  PROPOSING: "Leader validator proposing",
+  COMMITTING: "Validators committing votes",
+  REVEALING: "Validators revealing votes",
+  ACCEPTED: "Accepted by consensus",
+  FINALIZED: "Transaction finalized",
+  UNDETERMINED: "Consensus undetermined — safe to retry",
+  FAILED: "Transaction failed"
+};
+
 function shortAddress(value?: string) {
   if (!value) return "unknown";
   return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
@@ -83,7 +94,7 @@ function toViewSpans(loaded: LoadedFaultspanCase | null): ObligationSpanView[] {
   }));
 }
 
-export function FaultspanPrototype({ initialView = "overview" }: { initialView?: View }) {
+export function FaultspanPrototype({ initialView = "overview", initialCaseId }: { initialView?: View; initialCaseId?: string }) {
   const router = useRouter();
   const [loadedCase, setLoadedCase] = useState<LoadedFaultspanCase | null>(null);
   const spans = useMemo(() => toViewSpans(loadedCase), [loadedCase]);
@@ -149,6 +160,13 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
 
   useEffect(() => { void refreshCases(""); }, [refreshCases]);
 
+  // Deep-link support: /cases/[id] passes initialCaseId so the case loads
+  // standalone from the contract without requiring the search flow first.
+  useEffect(() => {
+    if (initialCaseId) void loadCase(initialCaseId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCaseId]);
+
   useEffect(() => {
     if (tx.phase !== "FINALIZED" || !loadedCase?.caseId) return;
     let cancelled = false;
@@ -188,20 +206,19 @@ export function FaultspanPrototype({ initialView = "overview" }: { initialView?:
         </header>
 
         <main id="case-workspace">
-          {tx.phase !== "IDLE" && <div className={`tx-banner tx-${tx.phase.toLowerCase()}`} role="status"><span className="tx-pulse" aria-hidden="true"></span><div><strong>{tx.phase === "SUBMITTING" ? "Studionet transaction pending" : tx.phase === "ACCEPTED" ? "Accepted by the network" : tx.phase === "FINALIZED" ? "Transaction finalized" : "Transaction failed"}</strong><small>{tx.message}{tx.hash ? ` - ${tx.hash.slice(0, 12)}...${tx.hash.slice(-8)}` : ""}</small></div></div>}
+          {tx.phase !== "IDLE" && <div className={`tx-banner tx-${tx.phase.toLowerCase()}`} role="status" aria-live="polite"><span className="tx-pulse" aria-hidden="true"></span><div><strong>{TX_PHASE_LABELS[tx.phase] ?? tx.phase}</strong><small>{tx.message}{tx.hash ? ` - ${tx.hash.slice(0, 12)}...${tx.hash.slice(-8)}` : ""}</small>{tx.retryable && <small className="tx-retry-hint"> Nothing was written to the contract — you can resubmit this action.</small>}</div></div>}
 
           {view === "overview" && <section className="landing-panel" aria-labelledby="landing-title">
-            <div className="landing-copy"><span className="eyebrow">Agentic dispute resolution</span><h1 id="landing-title">Faultspan</h1><p>Attribute failures across multi-agent commerce, preserve public evidence in Supabase, and submit adjudication flows to the GenLayer Studionet contract.</p><div className="landing-actions"><button className="button button-primary" onClick={openCaseBuilder}><Plus aria-hidden="true" size={16} />Create real case</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Submit evidence</button></div></div>
-            <div className="landing-instrument" aria-label="Live configuration"><div><span>Contract</span><strong className="mono">0x6Bd6...2DDb</strong></div><div><span>RPC</span><strong>studio.genlayer.com/api</strong></div><div><span>Storage</span><strong>IPFS via Pinata</strong></div><div><span>Verified case</span><strong className="mono">produce-a-buyer-ready-market-intelligence--mrlgwkai</strong></div></div>
+            <div className="landing-copy"><span className="eyebrow">Agentic dispute resolution</span><h1 id="landing-title">Faultspan</h1><p>Attribute failures across multi-agent commerce, pin public evidence to IPFS, and submit adjudication flows to the GenLayer Studionet contract.</p><div className="landing-actions"><button className="button button-primary" onClick={openCaseBuilder}><Plus aria-hidden="true" size={16} />Create real case</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Submit evidence</button></div></div>
+            <div className="landing-instrument" aria-label="Live configuration"><div><span>Contract</span><strong className="mono">0x6Bd6...2DDb</strong></div><div><span>RPC</span><strong>studio.genlayer.com/api</strong></div><div><span>Storage</span><strong>IPFS via Pinata</strong></div></div>
           </section>}
 
-          {view === "overview" && <section className="workspace-panel explorer-panel" aria-labelledby="proof-title"><header className="panel-head"><div><span className="eyebrow">Live Studionet proof</span><h2 id="proof-title">Verified reference flow</h2></div></header><div className="explorer-list"><button onClick={() => { setCaseQuery("produce-a-buyer-ready-market-intelligence--mrlgwkai"); void loadCase("produce-a-buyer-ready-market-intelligence--mrlgwkai"); router.push("/cases"); }}><span><strong>produce-a-buyer-ready-market-intelligence--mrlgwkai</strong><small>SETTLED · three spans · live dispute, evidence lock, adjudication, settlement, withdraw</small></span><span>Open the proven case record and inspect the locked evidence manifest, final tx-backed activity, and span finding.</span></button></div></section>}
 
           {view === "cases" && <>
             <div className="case-breadcrumb"><Link href="/overview">Overview</Link><ChevronRight aria-hidden="true" size={14} /><span>Cases</span></div>
             <section className="case-heading" aria-labelledby="case-title"><div><div className="eyebrow-row"><span className="eyebrow">Real Studionet mode</span><span className="status status-disputed"><Gavel aria-hidden="true" size={13} />Live contract</span></div><h1 id="case-title">{loadedCase ? loadedCase.caseId : "No synthetic case loaded"}</h1><p>{loadedCase ? `Loaded from get_case/get_case_span_ids/get_span. Current status: ${loadedCase.caseRecord.status || "unknown"}.` : "Create a case against the configured Studionet contract or query a real case id. This workspace no longer seeds demo disputes."}</p></div><div className="case-actions"><button className="button button-secondary"><FileText aria-hidden="true" size={16} />Export record</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Add evidence</button><button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus aria-hidden="true" size={16} />New case</button></div></section>
-            <section className="case-search-panel" aria-label="Search and load cases"><form className="case-search-row" onSubmit={(event) => { event.preventDefault(); void refreshCases(caseQuery); }}><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Search indexed cases or paste a case id" aria-label="Case search or case id" /><button className="button button-secondary" type="submit"><Search aria-hidden="true" size={16} />Search</button><button className="button button-primary" type="button" disabled={!caseQuery.trim() || caseLoading} onClick={() => void loadCase(caseQuery.trim())}>{caseLoading ? "Loading..." : "Load from contract"}</button></form>{caseSearchError && <p className="form-error">{caseSearchError}</p>}<div className="case-list">{caseList.map((item) => <button key={item.case_id} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.case_id} · {item.status} · {item.tx_hash ?? "no tx hash indexed"}</small></span><ChevronRight aria-hidden="true" size={16} /></button>)}</div></section>
-            {searchResults.length > 0 && <section className="workspace-panel explorer-panel" aria-labelledby="explorer-title"><header className="panel-head"><div><span className="eyebrow">Projection explorer</span><h2 id="explorer-title">Cases, spans, activity, tx hashes</h2></div></header><div className="explorer-list">{searchResults.map((item, index) => <button key={`${item.result_type}-${item.case_id}-${item.span_id ?? ""}-${item.tx_hash ?? ""}-${index}`} onClick={() => void loadCase(item.case_id)}><span><strong>{item.title}</strong><small>{item.result_type} · {item.case_id}{item.span_id ? ` · ${item.span_id}` : ""}{item.tx_hash ? ` · ${item.tx_hash}` : ""}</small></span><span>{item.subtitle}</span></button>)}</div></section>}
+            <section className="case-search-panel" aria-label="Search and load cases"><form className="case-search-row" onSubmit={(event) => { event.preventDefault(); void refreshCases(caseQuery); }}><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="Search indexed cases or paste a case id" aria-label="Case search or case id" /><button className="button button-secondary" type="submit"><Search aria-hidden="true" size={16} />Search</button><button className="button button-primary" type="button" disabled={!caseQuery.trim() || caseLoading} onClick={() => router.push(`/cases/${encodeURIComponent(caseQuery.trim())}`)}>{caseLoading ? "Loading..." : "Load from contract"}</button></form>{caseSearchError && <p className="form-error">{caseSearchError}</p>}<div className="case-list">{caseList.map((item) => <button key={item.case_id} onClick={() => router.push(`/cases/${item.case_id}`)}><span><strong>{item.title}</strong><small>{item.case_id} · {item.status} · {item.tx_hash ?? "no tx hash indexed"}</small></span><ChevronRight aria-hidden="true" size={16} /></button>)}</div></section>
+            {searchResults.length > 0 && <section className="workspace-panel explorer-panel" aria-labelledby="explorer-title"><header className="panel-head"><div><span className="eyebrow">Projection explorer</span><h2 id="explorer-title">Cases, spans, activity, tx hashes</h2></div></header><div className="explorer-list">{searchResults.map((item, index) => <button key={`${item.result_type}-${item.case_id}-${item.span_id ?? ""}-${item.tx_hash ?? ""}-${index}`} onClick={() => router.push(`/cases/${item.case_id}`)}><span><strong>{item.title}</strong><small>{item.result_type} · {item.case_id}{item.span_id ? ` · ${item.span_id}` : ""}{item.tx_hash ? ` · ${item.tx_hash}` : ""}</small></span><span>{item.subtitle}</span></button>)}</div></section>}
             <section className="case-facts" aria-label="Case facts"><Metric label="Bonded value" value={formatGen(loadedCase?.caseRecord.totalBonded ?? 0n)} detail={loadedCase ? "From get_case" : "Awaiting real case"} /><Metric label="Evidence" value={`${loadedCase?.caseRecord.evidence_manifest?.split("\n").filter(Boolean).length ?? 0} refs`} detail={loadedCase ? "Manifest entries" : "No manifest loaded"} /><Metric label="Current phase" value={loadedCase?.caseRecord.status || "Not loaded"} detail="Studionet accepted state" /><Metric label="Potential recovery" value={formatGen(loadedCase?.caseRecord.totalSlashed ?? 0n)} detail="After adjudication/settlement" /></section>
             <CaseWorkflowPanel
               caseId={loadedCase?.caseId ?? caseQuery.trim()}

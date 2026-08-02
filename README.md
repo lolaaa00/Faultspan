@@ -6,6 +6,8 @@
 
 > Trustless, AI-consensus dispute resolution on GenLayer.
 
+**Live app:** [faultspan-web-248l.vercel.app](https://faultspan-web-248l.vercel.app) · **Backend:** `https://faultspan-worker.ayoolarachi.workers.dev`
+
 When a delegated AI workflow fails, Faultspan answers: **which obligation failed, what evidence proves it, and how should value recover?**
 
 ---
@@ -102,6 +104,8 @@ All consensus outputs are validated inside the contract before being written to 
 | RPC | `https://studio.genlayer.com/api` |
 | Address | `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` |
 | Source | `contracts/faultspan.py` |
+
+> **Note:** The contract is pinned to genvm `v0.2.16` (see comment at the top of `contracts/faultspan.py`) because `v0.3.0-rc7` dropped the `genvm-universal.tar.xz` asset that `gltest` depends on. Redeploying against a newer GenLayer SDK/genvm version may require re-validating this compatibility.
 
 ---
 

@@ -1,5 +1,7 @@
 # Faultspan Live Studionet Proof
 
+> **Historical record — contract address has since changed.** This proof ran against `0x23B6F12322d811918c4Ca5De210529d6cB09Df5D`, an earlier Studionet deployment of the same contract source. The currently live contract is `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` (see [README.md](../README.md)) — the case ID and evidence URL below **do not exist on the current deployment** and will error if queried against it. The evidence URL below is also no longer reachable (it pointed at an interim backend that has since been replaced by `services/worker`). Kept for historical record of the methodology; a fresh proof run against the current contract is the next step, not this document.
+
 This document records the real GenLayer Studionet case used to prove the end-to-end Faultspan dispute flow with live transactions, live evidence fetch, live adjudication, and deterministic settlement.
 
 ## Environment
