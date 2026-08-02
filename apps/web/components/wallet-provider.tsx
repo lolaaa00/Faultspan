@@ -5,11 +5,19 @@ import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import { ExecutionResult, TransactionStatus, type TransactionHash } from "genlayer-js/types";
 import { appendActivityRecord, PLATFORM_API_URL, saveCaseProjection, saveSpanProjection } from "@/lib/platform-api";
+import { pollTransactionLifecycle, RETRYABLE_STATUSES, type LifecycleStage } from "@/lib/genlayer";
+import {
+  createAndStoreGeneratedWallet,
+  loadGeneratedWallet,
+  type GeneratedAccount
+} from "@/lib/generated-wallet";
 
 type EthereumProvider = { request(args: { method: string; params?: unknown[] | Record<string, unknown>[] }): Promise<unknown> };
 declare global { interface Window { ethereum?: EthereumProvider } }
 
-type TxState = { phase: "IDLE" | "SUBMITTING" | "ACCEPTED" | "FINALIZED" | "FAILED"; hash?: string; message?: string };
+export type WalletMode = "injected" | "generated";
+type TxPhase = "IDLE" | "SUBMITTING" | "PROPOSING" | "COMMITTING" | "REVEALING" | "ACCEPTED" | "FINALIZED" | "UNDETERMINED" | "FAILED";
+type TxState = { phase: TxPhase; hash?: string; message?: string; retryable?: boolean };
 type CaseInput = { title: string; coordinator: `0x${string}`; bond: string };
 type EvidenceInput = { caseId: string; spanId: string; obligation: string; statement: string };
 type RegisterSpanInput = {
@@ -29,10 +37,13 @@ type DisputeInput = { caseId: string; claimRef: string; claimDigest: string };
 type ContractEvidenceInput = { caseId: string; spanId: string; evidenceRef: string; evidenceDigest: string };
 type WalletContextValue = {
   address: `0x${string}` | null;
+  mode: WalletMode | null;
+  hasInjectedWallet: boolean;
   connecting: boolean;
   walletError: string | null;
   tx: TxState;
   connect(): Promise<void>;
+  connectGenerated(): void;
   disconnect(): void;
   createCase(input: CaseInput): Promise<{ onchain: boolean; caseId: string }>;
   submitEvidence(input: EvidenceInput): Promise<{ evidenceId: string; digest: string; publicPath: string; byteLength?: number }>;
@@ -49,6 +60,7 @@ type WalletContextValue = {
 
 const STUDIONET_CHAIN_ID = "0xf22f";
 const WALLET_STORAGE_KEY = "faultspan.connectedWallet";
+const WALLET_MODE_KEY = "faultspan.connectedMode";
 const WalletContext = createContext<WalletContextValue | null>(null);
 
 function slug(value: string) {
@@ -89,13 +101,15 @@ async function ensureStudionet(provider: EthereumProvider) {
   }
 }
 
-async function createPlatformSession(provider: EthereumProvider, address: `0x${string}`) {
+type SignMessage = (message: string) => Promise<string>;
+
+async function createPlatformSession(sign: SignMessage, address: `0x${string}`) {
   const challengeResponse = await fetch(`${PLATFORM_API_URL}/v1/auth/challenge`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address })
   });
   if (!challengeResponse.ok) throw new Error("Platform API did not issue a wallet challenge");
   const challenge = await challengeResponse.json() as { challenge_id: string; message: string };
-  const signature = await provider.request({ method: "personal_sign", params: [challenge.message, address] }) as string;
+  const signature = await sign(challenge.message);
   const sessionResponse = await fetch(`${PLATFORM_API_URL}/v1/auth/verify`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ challenge_id: challenge.challenge_id, signature })
   });
@@ -122,19 +136,22 @@ function isSuccessfulExecution(receipt: { txExecutionResultName?: unknown; resul
     || resultCode === "SUCCESS";
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<`0x${string}` | null>(null);
+  const [mode, setMode] = useState<WalletMode | null>(null);
+  const [generatedAccount, setGeneratedAccount] = useState<GeneratedAccount | null>(null);
+  const [hasInjectedWallet, setHasInjectedWallet] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [tx, setTx] = useState<TxState>({ phase: "IDLE" });
 
+  useEffect(() => {
+    setHasInjectedWallet(typeof window !== "undefined" && Boolean(window.ethereum));
+  }, []);
+
   const connect = useCallback(async () => {
     setWalletError(null);
-    if (!window.ethereum) { setWalletError("No browser wallet detected. Install MetaMask or open the wallet extension you want to use."); return; }
+    if (!window.ethereum) { setWalletError("No browser wallet detected. Install MetaMask, or use a browser wallet with no extension required."); return; }
     setConnecting(true);
     try {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" }) as string[];
@@ -142,17 +159,38 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!selected) throw new Error("Wallet returned no account");
       await ensureStudionet(window.ethereum);
       setAddress(selected);
+      setMode("injected");
+      setGeneratedAccount(null);
       window.localStorage.setItem(WALLET_STORAGE_KEY, selected);
+      window.localStorage.setItem(WALLET_MODE_KEY, "injected");
     } catch (error) {
       setWalletError(walletMessage(error));
     } finally { setConnecting(false); }
   }, []);
 
+  /** Generates (or restores) a locally-signed browser wallet — zero-friction path
+   * when no extension is present. Caller is responsible for the risk acknowledgement. */
+  const connectGenerated = useCallback(() => {
+    setWalletError(null);
+    try {
+      const account = createAndStoreGeneratedWallet();
+      setGeneratedAccount(account);
+      setAddress(account.address as `0x${string}`);
+      setMode("generated");
+      window.localStorage.setItem(WALLET_MODE_KEY, "generated");
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : "Could not create a browser wallet");
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
     setAddress(null);
+    setMode(null);
+    setGeneratedAccount(null);
     setWalletError(null);
     setTx({ phase: "IDLE" });
     window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    window.localStorage.removeItem(WALLET_MODE_KEY);
   }, []);
 
   useEffect(() => {
@@ -160,9 +198,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       on?: (event: string, listener: (...args: unknown[]) => void) => void;
       removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
     }) | undefined;
-    if (!provider) return;
 
     let cancelled = false;
+    const rememberedMode = window.localStorage.getItem(WALLET_MODE_KEY);
+
+    if (rememberedMode === "generated") {
+      const restored = loadGeneratedWallet();
+      if (restored) {
+        setGeneratedAccount(restored);
+        setAddress(restored.address as `0x${string}`);
+        setMode("generated");
+      }
+      return;
+    }
+
+    if (!provider) return;
+
     const restore = async () => {
       const remembered = window.localStorage.getItem(WALLET_STORAGE_KEY);
       if (!remembered) return;
@@ -176,6 +227,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         await ensureStudionet(provider);
         if (!cancelled) {
           setAddress(match);
+          setMode("injected");
           setWalletError(null);
         }
       } catch {
@@ -187,8 +239,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const next = Array.isArray(accounts) ? accounts[0] : null;
       if (typeof next === "string" && next) {
         setAddress(next as `0x${string}`);
+        setMode("injected");
         setWalletError(null);
         window.localStorage.setItem(WALLET_STORAGE_KEY, next);
+        window.localStorage.setItem(WALLET_MODE_KEY, "injected");
         return;
       }
       disconnect();
@@ -209,16 +263,51 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, [disconnect]);
 
+  /** Builds a write-capable client for whichever wallet is active. Reads always use
+   * the account-less `readClient` (see lib/genlayer.ts); this is the single place a
+   * write client is constructed, so the signing identity can never drift from the
+   * address the UI displays. */
+  const buildWriteClient = useCallback(() => {
+    if (mode === "generated" && generatedAccount) {
+      return createClient({ chain: studionet, account: generatedAccount });
+    }
+    if (mode === "injected" && address && window.ethereum) {
+      return createClient({ chain: studionet, account: address, provider: window.ethereum as never });
+    }
+    throw new Error("Connect a Studionet wallet before submitting contract actions");
+  }, [mode, address, generatedAccount]);
+
+  /** Signs an arbitrary message with whichever wallet is active — used for the
+   * platform-evidence auth challenge. Injected wallets sign via personal_sign;
+   * a generated wallet signs locally with no extension involved. */
+  const signChallenge = useCallback<SignMessage>(async (message) => {
+    if (mode === "generated" && generatedAccount) {
+      return generatedAccount.signMessage({ message });
+    }
+    if (mode === "injected" && address && window.ethereum) {
+      return window.ethereum.request({ method: "personal_sign", params: [message, address] }) as Promise<string>;
+    }
+    throw new Error("Connect a Studionet wallet before signing");
+  }, [mode, address, generatedAccount]);
+
+  const stageMessage: Record<string, string> = {
+    PENDING: "Transaction queued on Studionet.",
+    PROPOSING: "Leader validator is proposing a result.",
+    COMMITTING: "Validators are committing their votes.",
+    REVEALING: "Validators are revealing votes to reach consensus.",
+    ACCEPTED: "Accepted by consensus. Waiting for the appeal window to finalize.",
+    READY_TO_FINALIZE: "Consensus reached. Finalizing on Studionet."
+  };
+
   const runWrite = useCallback(async <T,>(
     label: string,
     callback: (client: ReturnType<typeof createClient>, contract: `0x${string}`) => Promise<T>
   ) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before submitting contract actions");
+    if (mode === "injected" && window.ethereum) await ensureStudionet(window.ethereum);
     const contract = requireContractAddress();
-    setTx({ phase: "SUBMITTING", message: `Confirm ${label.toLowerCase()} in your wallet.` });
+    setTx({ phase: "SUBMITTING", message: `Confirm ${label.toLowerCase()} ${mode === "generated" ? "with your browser wallet" : "in your wallet"}.` });
     try {
-      await ensureStudionet(window.ethereum);
-      const client = createClient({ chain: studionet, account: address, provider: window.ethereum as never });
+      const client = buildWriteClient();
       const result = await callback(client, contract);
       return result;
     } catch (error) {
@@ -226,39 +315,47 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setTx({ phase: "FAILED", message });
       throw new Error(message);
     }
-  }, [address]);
+  }, [mode, buildWriteClient]);
 
   const finalizeHash = useCallback(async <T extends { hash: string }>(hash: string, successMessage: string, value: T) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before submitting contract actions");
-    const client = createClient({ chain: studionet, account: address, provider: window.ethereum as never });
+    const client = buildWriteClient();
     setTx({ phase: "SUBMITTING", hash, message: "Transaction submitted to Studionet." });
-    await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.ACCEPTED, retries: 120, interval: 2_000 });
-    setTx({ phase: "ACCEPTED", hash, message: "Accepted. Waiting for validator finalization." });
 
-    let receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 240, interval: 3_000 });
-    if (!isSuccessfulExecution(receipt)) {
-      setTx({ phase: "ACCEPTED", hash, message: "Finalized status reached. Verifying execution result..." });
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        await sleep(2_500);
-        receipt = await client.waitForTransactionReceipt({ hash: hash as TransactionHash, status: TransactionStatus.FINALIZED, retries: 1, interval: 1_000 });
-        if (isSuccessfulExecution(receipt)) break;
+    const transaction = await pollTransactionLifecycle(client, hash as TransactionHash, (stage: LifecycleStage) => {
+      if (stage.retryable) {
+        setTx({
+          phase: "UNDETERMINED",
+          hash,
+          message: `Validators reached ${stage.status} — nothing was written to the contract. This is a known, retryable Studionet outcome, not an error. You can safely resubmit.`,
+          retryable: true
+        });
+        return;
       }
-    }
+      const phase = (stage.status in { PROPOSING: 1, COMMITTING: 1, REVEALING: 1, ACCEPTED: 1, FINALIZED: 1 }
+        ? stage.status
+        : "SUBMITTING") as TxPhase;
+      setTx({ phase, hash, message: stageMessage[stage.status] ?? `Status: ${stage.status}` });
+    });
 
-    if (!isSuccessfulExecution(receipt)) {
-      const execution = String((receipt as { txExecutionResultName?: unknown }).txExecutionResultName ?? "unknown");
-      const resultCode = String((receipt as { resultCode?: unknown }).resultCode ?? "unknown");
-      throw new Error(`Transaction finalized, but execution still reports ${execution}/${resultCode}`);
+    const finalStatus = String(transaction.statusName ?? transaction.status ?? "");
+    if (RETRYABLE_STATUSES.has(finalStatus)) {
+      throw new Error(`Validators reached ${finalStatus} — nothing was written. Please retry.`);
+    }
+    if (!isSuccessfulExecution(transaction)) {
+      const execution = String((transaction as { txExecutionResultName?: unknown }).txExecutionResultName ?? "unknown");
+      const resultCode = String((transaction as { resultCode?: unknown }).resultCode ?? "unknown");
+      const message = `Transaction finalized, but execution reports ${execution}/${resultCode}`;
+      setTx({ phase: "FAILED", hash, message });
+      throw new Error(message);
     }
     setTx({ phase: "FINALIZED", hash, message: successMessage });
     return value;
-  }, [address]);
+  }, [buildWriteClient, stageMessage]);
 
   const createCase = useCallback(async (input: CaseInput) => {
     const caseId = `${slug(input.title) || "case"}-${Date.now().toString(36)}`;
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before creating a case");
-    const provider = window.ethereum;
-    const sessionToken = await createPlatformSession(provider, address);
+    if (!address) throw new Error("Connect a Studionet wallet before creating a case");
+    const sessionToken = await createPlatformSession(signChallenge, address);
     const termsResponse = await fetch(`${PLATFORM_API_URL}/v1/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
@@ -313,11 +410,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return { onchain: true, caseId };
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const submitEvidence = useCallback(async (input: EvidenceInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect the submitting wallet first");
-    const sessionToken = await createPlatformSession(window.ethereum, address);
+    if (!address) throw new Error("Connect the submitting wallet first");
+    const sessionToken = await createPlatformSession(signChallenge, address);
     const evidenceResponse = await fetch(`${PLATFORM_API_URL}/v1/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
@@ -350,11 +447,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       summary: `Stored evidence bundle ${receipt.evidence_id} for ${input.spanId}`
     });
     return result;
-  }, [address]);
+  }, [address, signChallenge]);
 
   const registerSpan = useCallback(async (input: RegisterSpanInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before registering a span");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before registering a span");
     return runWrite("Register span", async (client, contract) => {
       const digest = await sha256(input.obligation);
       const hash = await client.writeContract({
@@ -375,7 +471,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Span ${input.spanId} registered.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await saveSpanProjection({
         case_id: input.caseId,
         span_id: input.spanId,
@@ -398,11 +494,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const acceptSpan = useCallback(async (input: AcceptSpanInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before accepting a span");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before accepting a span");
     return runWrite("Accept span", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -411,7 +506,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: input.bondWei
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Span ${input.spanId} accepted and bonded.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: input.caseId,
         span_id: input.spanId,
@@ -423,11 +518,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const submitDelivery = useCallback(async (input: DeliveryInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before submitting delivery");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before submitting delivery");
     return runWrite("Submit delivery", async (client, contract) => {
       const deliveryDigest = await sha256(input.deliveryRef);
       const hash = await client.writeContract({
@@ -437,7 +531,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Delivery submitted for ${input.spanId}.`, { hash, deliveryDigest });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: input.caseId,
         span_id: input.spanId,
@@ -449,11 +543,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const openDispute = useCallback(async (input: DisputeInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before opening a dispute");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before opening a dispute");
     return runWrite("Open dispute", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -462,7 +555,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Dispute opened for ${input.caseId}.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: input.caseId,
         span_id: null,
@@ -474,11 +567,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const submitEvidenceToContract = useCallback(async (input: ContractEvidenceInput) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before linking contract evidence");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before linking contract evidence");
     return runWrite("Submit contract evidence", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -487,7 +579,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Evidence linked to ${input.spanId}.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: input.caseId,
         span_id: input.spanId,
@@ -499,11 +591,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const lockEvidence = useCallback(async (caseId: string) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before locking evidence");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before locking evidence");
     return runWrite("Lock evidence", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -512,7 +603,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Evidence locked for ${caseId}.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: caseId,
         span_id: null,
@@ -524,11 +615,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const adjudicateCase = useCallback(async (caseId: string) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before adjudicating");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before adjudicating");
     return runWrite("Adjudicate case", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -537,7 +627,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Adjudication finalized for ${caseId}.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: caseId,
         span_id: null,
@@ -549,11 +639,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const settleCase = useCallback(async (caseId: string) => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before settling");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before settling");
     return runWrite("Settle case", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -562,7 +651,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, `Settlement finalized for ${caseId}.`, { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: caseId,
         span_id: null,
@@ -574,11 +663,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const withdrawClaimable = useCallback(async () => {
-    if (!address || !window.ethereum) throw new Error("Connect a Studionet wallet before withdrawing");
-    const provider = window.ethereum;
+    if (!address) throw new Error("Connect a Studionet wallet before withdrawing");
     return runWrite("Withdraw claimable balance", async (client, contract) => {
       const hash = await client.writeContract({
         address: contract,
@@ -587,7 +675,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         value: 0n
       }) as TransactionHash;
       const result = await finalizeHash(hash, "Withdraw finalized on Studionet.", { hash });
-      const sessionToken = await createPlatformSession(provider, address);
+      const sessionToken = await createPlatformSession(signChallenge, address);
       await recordActivity(sessionToken, {
         case_id: "global",
         span_id: null,
@@ -599,14 +687,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
       return result;
     });
-  }, [address, finalizeHash, runWrite]);
+  }, [address, finalizeHash, runWrite, signChallenge]);
 
   const value = useMemo(() => ({
     address,
+    mode,
+    hasInjectedWallet,
     connecting,
     walletError,
     tx,
     connect,
+    connectGenerated,
     disconnect,
     createCase,
     submitEvidence,
@@ -619,7 +710,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     adjudicateCase,
     settleCase,
     withdrawClaimable
-  }), [address, connecting, walletError, tx, connect, disconnect, createCase, submitEvidence, registerSpan, acceptSpan, submitDelivery, openDispute, submitEvidenceToContract, lockEvidence, adjudicateCase, settleCase, withdrawClaimable]);
+  }), [address, mode, hasInjectedWallet, connecting, walletError, tx, connect, connectGenerated, disconnect, createCase, submitEvidence, registerSpan, acceptSpan, submitDelivery, openDispute, submitEvidenceToContract, lockEvidence, adjudicateCase, settleCase, withdrawClaimable]);
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }
 

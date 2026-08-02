@@ -76,6 +76,8 @@ a { color: inherit; }
 .wallet-actions { display: flex; align-items: center; gap: 6px; }
 .wallet-disconnect { width: 44px; height: 44px; border: 1px solid var(--border-strong); background: var(--surface); }
 .wallet-error { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; display: flex; width: max-content; max-width: 280px; align-items: center; gap: 6px; padding: 8px 10px; color: var(--fs-red-700); background: color-mix(in oklch, var(--fs-red-300) 22%, var(--surface)); border: 1px solid var(--fs-red-300); border-radius: var(--fs-radius-sm); font-size: var(--fs-text-xs); }
+.wallet-mode-tag { padding: 2px 8px; margin-left: 6px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; font-size: var(--fs-text-xs); font-weight: 400; }
+.tx-retry-hint { display: block; margin-top: 4px; color: var(--fs-amber-700, var(--muted)); }
 
 main { width: min(100%, var(--fs-container)); margin: 0 auto; padding: 28px 32px 40px; }
 .case-breadcrumb { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; font: 12px var(--fs-font-mono); color: var(--subtle); }
