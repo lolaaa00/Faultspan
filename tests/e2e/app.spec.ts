@@ -16,12 +16,13 @@ test("landing page shows product promise and opens workspace", async ({ page }) 
   await page.getByRole("link", { name: /open workspace/i }).click();
   await expect(page).toHaveURL(/\/overview$/);
   await expect(page.getByRole("heading", { name: "Faultspan" })).toBeVisible();
-  await expect(page.getByText(/verified reference flow/i)).toBeVisible();
+  await expect(page.getByLabel(/live configuration/i)).toBeVisible();
 });
 
-test("overview exposes verified case and evidence workspace", async ({ page }) => {
+test("overview exposes live contract configuration and evidence workspace", async ({ page }) => {
   await page.goto("/overview");
-  await expect(page.getByRole("button", { name: /produce-a-buyer-ready-market-intelligence--mrlgwkai/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /create real case/i })).toBeVisible();
+  await expect(page.getByLabel(/live configuration/i)).toContainText(/0x6Bd6/i);
   await page.goto("/evidence");
   await expect(page.getByRole("heading", { name: /^evidence$/i })).toBeVisible();
   await expect(page.getByText(/ipfs evidence vault/i)).toBeVisible();
