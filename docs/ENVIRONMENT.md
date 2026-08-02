@@ -1,4 +1,6 @@
-# Faultspan Environment Variables
+# Faultspan Environment Variables (deprecated)
+
+> **This document describes the retired Supabase/FastAPI backend (`services/platform`), which has been removed from the repository.** The current, maintained environment-variable reference is in [HANDOVER.md](../HANDOVER.md) — it covers the four `NEXT_PUBLIC_*` frontend variables and the Cloudflare Worker's `PINATA_JWT`/`ALLOWED_ORIGINS`. Keeping this file for historical reference only.
 
 ## Where to put them
 

@@ -1,2 +1,0 @@
-"""Faultspan platform service."""
-

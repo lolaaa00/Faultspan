@@ -1,4 +1,6 @@
-# Faultspan Deployment Preparation
+# Faultspan Deployment Preparation (deprecated)
+
+> **This document describes the retired Supabase/FastAPI backend (`services/platform`), which has been removed from the repository.** The current, maintained deployment path — Cloudflare Worker + D1 + Pinata — is documented in [HANDOVER.md](../HANDOVER.md). Keeping this file for historical reference only; do not follow it for a fresh deployment.
 
 This repository is prepared for source-based deployment with hosted Supabase Storage. No external deployment has been performed by this document.
 

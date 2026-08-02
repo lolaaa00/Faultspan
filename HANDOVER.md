@@ -24,8 +24,7 @@ faultspan/
 ├── apps/web/              Next.js frontend
 ├── contracts/             GenLayer Intelligent Contract (Python, already deployed)
 ├── packages/domain/       Shared TypeScript types and validation
-├── services/worker/       Cloudflare Worker — the backend API (replaces the Python platform)
-├── services/platform/     Old Python backend — you do NOT need this anymore
+├── services/worker/       Cloudflare Worker — the backend API
 └── tests/                 Integration and e2e tests
 ```
 
