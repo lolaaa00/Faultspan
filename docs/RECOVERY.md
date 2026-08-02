@@ -12,10 +12,10 @@
 
 ## Evidence service unavailable
 
-1. Check `/health` and `/ready` separately.
-2. Verify the evidence directory exists and is writable.
-3. Verify `SUPABASE_URL`, the backend secret, and `SUPABASE_EVIDENCE_BUCKET` point to the intended project and private bucket.
-4. Restore content-addressed objects from a snapshot if required.
+1. Check `/health` and `/ready` on the Cloudflare Worker (`services/worker`) separately — `/ready` reports Pinata connectivity.
+2. Verify `PINATA_JWT` is set (`wrangler secret put PINATA_JWT`) and hasn't expired or been revoked in the Pinata dashboard.
+3. Verify the D1 database and KV namespace bindings in `services/worker/wrangler.jsonc` still point to the intended resources.
+4. Evidence is content-addressed on IPFS — re-fetch by digest from the gateway if a specific object is unreachable; it is not something Faultspan snapshots itself.
 5. Do not adjudicate a case whose locked evidence cannot be retrieved.
 
 ## Transaction stuck or rejected
