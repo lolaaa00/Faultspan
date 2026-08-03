@@ -74,3 +74,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_GENLAYER_RPC_URL: "https://studio.genlayer.com/api"
+          NEXT_PUBLIC_GENLAYER_CHAIN_ID: "61999"
+          NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS: "0x161275d7E8b18C58E0C88518c74BD036c96F998C"
+          NEXT_PUBLIC_PLATFORM_API_URL: "https://faultspan-worker.ayoolarachi.workers.dev"
