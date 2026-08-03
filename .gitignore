@@ -16,3 +16,4 @@ services/platform/data/evidence/*
 !services/platform/data/evidence/.gitkeep
 test-results/
 playwright-report/
+.vercel
