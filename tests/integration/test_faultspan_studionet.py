@@ -10,9 +10,12 @@ every run rather than relying on funded/configured keys. No secrets are
 required or read from the environment.
 
 Run with: gltest tests/integration/ -v -s
-This test performs real network calls and a real LLM adjudication round,
-so it is slow (often 1-3 minutes) and is not part of the fast direct-test
-feedback loop (tests/direct/).
+This test performs real network calls, a real LLM adjudication round, and a
+real-time wait for MIN_EVIDENCE_WINDOW_SECONDS (see contracts/faultspan.py)
+before evidence can be locked, so it now takes roughly an hour end to end.
+It is not part of the fast direct-test feedback loop (tests/direct/) and
+is only run on demand or on the weekly schedule (see
+.github/workflows/studionet-smoke.yml), not on every push.
 """
 
 import hashlib
@@ -41,6 +44,13 @@ EVIDENCE_URL = (
 
 WAIT_INTERVAL_MS = 4000
 WAIT_RETRIES = 90  # generous budget for consensus + LLM adjudication rounds
+# Mirrors MIN_EVIDENCE_WINDOW_SECONDS in contracts/faultspan.py. This is a
+# real-time wait against a real chain -- there is no clock to warp here --
+# so this test now runs roughly an hour longer than before. That is a
+# deliberate tradeoff: the window exists to make instant self-locking
+# structurally impossible in production, and weakening it just to keep
+# this on-demand/weekly test fast would defeat the point of the fix.
+MIN_EVIDENCE_WINDOW_SECONDS = 3_600
 
 
 def _fetch_evidence_digest() -> str:
@@ -141,6 +151,15 @@ def test_full_case_lifecycle_on_studionet(evidence_digest):
         wait_retries=WAIT_RETRIES,
     )
     assert tx_execution_succeeded(receipt)
+
+    # Evidence must stay open for MIN_EVIDENCE_WINDOW_SECONDS after the
+    # dispute was opened, even for the claimant -- wait out whatever's left
+    # of that window (the preceding transactions' own consensus latency may
+    # already cover most or all of it).
+    case = owner_contract.get_case(args=[case_id]).call()
+    remaining = (int(case["dispute_opened_at"]) + MIN_EVIDENCE_WINDOW_SECONDS) - _chain_now(owner_contract)
+    if remaining > 0:
+        time.sleep(remaining + 5)
 
     receipt = owner_contract.lock_evidence(args=[case_id]).transact(
         wait_transaction_status=TransactionStatus.ACCEPTED,

@@ -8,7 +8,9 @@ rejected-consensus, and insufficient-evidence behavior.
 Run with: pytest tests/direct/ -v
 """
 
+import hashlib
 import json
+import re
 from datetime import datetime, timezone
 
 import pytest
@@ -26,16 +28,26 @@ BASE_ISO = "2026-01-01T00:00:00Z"
 BASE_TS = int(datetime.fromisoformat(BASE_ISO.replace("Z", "+00:00")).timestamp())
 DELIVERY_DEADLINE = BASE_TS + 3600
 EVIDENCE_DEADLINE = BASE_TS + 7200
+# Mirrors MIN_EVIDENCE_WINDOW_SECONDS in contracts/faultspan.py.
+MIN_EVIDENCE_WINDOW_SECONDS = 3_600
 
 
 def _iso(ts: int) -> str:
     return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _valid_verdict(span_ids, findings):
+# Real digest of the body most tests' catch-all mock_web(".*", ...) returns,
+# so root-terms digest verification passes by default. Tests exercising the
+# unverified-root-terms path override this with a mismatched body instead.
+DEFAULT_MOCK_BODY = "evidence body"
+DEFAULT_MOCK_DIGEST = "sha256:" + hashlib.sha256(DEFAULT_MOCK_BODY.encode()).hexdigest()
+
+
+def _valid_verdict(span_ids, findings, rubric_verified=True):
     """Build a JSON verdict string. `findings` maps span_id -> finding."""
     return json.dumps({
-        "caseSatisfied": any(f != "COMPLIED" for f in findings.values()),
+        "rubricVerified": rubric_verified,
+        "caseSatisfied": rubric_verified and any(f != "COMPLIED" for f in findings.values()),
         "findings": [
             {
                 "spanId": span_id,
@@ -80,7 +92,7 @@ class Scenario:
 
         self.contract.create_case(
             self.case_id, coordinator,
-            "https://example.com/terms", "sha256:" + "a" * 64,
+            "https://example.com/terms", DEFAULT_MOCK_DIGEST,
             DELIVERY_DEADLINE, EVIDENCE_DEADLINE,
         )
 
@@ -114,14 +126,18 @@ class Scenario:
         self.contract.accept_span(self.case_id, self.span_b)
         vm.value = 0
 
-    def dispute_and_lock(self, evidence_url="https://evidence.example.com/e1"):
+    def dispute_and_lock(self, evidence_url="https://evidence.example.com/e1", disputant=None):
         vm = self.vm
-        vm.sender = self.owner
+        vm.sender = disputant if disputant is not None else self.owner
         self.contract.open_dispute(self.case_id, "https://example.com/claim", "sha256:" + "e" * 64)
         vm.sender = self.provider_a
         self.contract.submit_evidence(
             self.case_id, self.span_a, evidence_url, "sha256:" + "f" * 64,
         )
+        # The minimum counter-evidence window must elapse before anyone --
+        # including whoever opened the dispute -- may lock.
+        dispute_opened_at = int(self.contract.get_case(self.case_id).dispute_opened_at)
+        vm.warp(_iso(dispute_opened_at + MIN_EVIDENCE_WINDOW_SECONDS + 1))
         vm.sender = self.owner
         self.contract.lock_evidence(self.case_id)
 
@@ -175,13 +191,61 @@ def test_non_participant_cannot_open_dispute(scenario):
         scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "2" * 64)
 
 
-def test_non_claimant_cannot_lock_evidence_before_deadline(scenario):
+def test_non_claimant_cannot_lock_evidence_before_window_or_deadline(scenario):
     scenario.accept_all()
     scenario.vm.sender = scenario.owner
     scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "3" * 64)
     scenario.vm.sender = scenario.provider_a
-    with scenario.vm.expect_revert("only claimant may lock evidence before deadline"):
+    with scenario.vm.expect_revert("minimum counter-evidence window has not elapsed"):
         scenario.contract.lock_evidence(scenario.case_id)
+
+
+def test_claimant_also_cannot_lock_evidence_before_window_elapses(scenario):
+    # The whole point of the fix: opening the dispute must not let the same
+    # party immediately close the evidence window before anyone else can
+    # respond. The claimant gets no special early-lock privilege.
+    scenario.accept_all()
+    scenario.vm.sender = scenario.owner
+    scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "3" * 64)
+    with scenario.vm.expect_revert("minimum counter-evidence window has not elapsed"):
+        scenario.contract.lock_evidence(scenario.case_id)
+
+
+def test_lock_evidence_allowed_once_minimum_window_elapses(scenario):
+    scenario.accept_all()
+    scenario.vm.sender = scenario.owner
+    scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "3" * 64)
+    opened_at = int(scenario.contract.get_case(scenario.case_id).dispute_opened_at)
+    scenario.vm.warp(_iso(opened_at + MIN_EVIDENCE_WINDOW_SECONDS + 1))
+    scenario.contract.lock_evidence(scenario.case_id)
+    case = scenario.contract.get_case(scenario.case_id)
+    assert case.status == "EVIDENCE_LOCKED"
+
+
+def test_lock_evidence_requires_participant(scenario):
+    scenario.accept_all()
+    scenario.vm.sender = scenario.owner
+    scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "3" * 64)
+    opened_at = int(scenario.contract.get_case(scenario.case_id).dispute_opened_at)
+    scenario.vm.warp(_iso(opened_at + MIN_EVIDENCE_WINDOW_SECONDS + 1))
+    from gltest.direct import create_address
+    outsider = create_address("outsider2")
+    scenario.vm.sender = outsider
+    with scenario.vm.expect_revert("case participant required"):
+        scenario.contract.lock_evidence(scenario.case_id)
+
+
+def test_open_dispute_rejected_while_any_span_still_proposed(scenario):
+    # Only bond two of the three registered spans -- span_b stays PROPOSED.
+    scenario.vm.sender = scenario.provider_a
+    scenario.vm.value = 1000
+    scenario.contract.accept_span(scenario.case_id, scenario.root_span)
+    scenario.vm.value = 1000
+    scenario.contract.accept_span(scenario.case_id, scenario.span_a)
+    scenario.vm.value = 0
+    scenario.vm.sender = scenario.owner
+    with scenario.vm.expect_revert("all registered spans must be bonded before a dispute can be opened"):
+        scenario.contract.open_dispute(scenario.case_id, "https://example.com/claim", "sha256:" + "3" * 64)
 
 
 # ---------------------------------------------------------------------------
@@ -416,7 +480,11 @@ def test_settlement_conserves_bonded_value(scenario):
     owner_claim = int(scenario.contract.get_claimable(scenario.owner))
     assert provider_a_claim == 1000 + 500  # root fully returned + span_a partial
     assert provider_b_claim == 1600
-    assert owner_claim == 500 + 400  # slashed amounts flow to the claimant
+    # Slashed amounts flow to case.owner (who happens to be the disputing
+    # claimant in this default scenario) -- see
+    # test_slashed_value_flows_to_owner_not_disputing_participant for proof
+    # this is owner-routing, not claimant-routing, when they differ.
+    assert owner_claim == 500 + 400
 
 
 # ---------------------------------------------------------------------------
@@ -516,7 +584,11 @@ def test_insufficient_evidence_finding_does_not_slash(scenario):
 def test_digest_mismatched_evidence_is_visible_to_adjudication(scenario):
     scenario.accept_all()
     scenario.dispute_and_lock()
-    # Mock web body so its sha256 will NOT match the digest submitted in
+    # Root terms must still verify -- this test is only about a mismatched
+    # *evidence* digest, not the separate root-terms-unverified path.
+    scenario.vm.mock_web(re.escape("https://example.com/terms"), {"status": 200, "body": DEFAULT_MOCK_BODY})
+    # Everything else (submitted evidence, obligation/delivery refs) gets a
+    # body whose sha256 will NOT match the digest submitted in
     # submit_evidence, exercising the digestMatched=False path.
     scenario.vm.mock_web(".*", {"status": 200, "body": "a completely different body"})
     scenario.vm.mock_llm(".*", _valid_verdict(
@@ -527,3 +599,104 @@ def test_digest_mismatched_evidence_is_visible_to_adjudication(scenario):
     verdict = scenario.contract.adjudicate_case(scenario.case_id)
     finding_map = {f["spanId"]: f["finding"] for f in verdict["findings"]}
     assert finding_map[scenario.span_a] == "INSUFFICIENT_EVIDENCE"
+
+
+# ---------------------------------------------------------------------------
+# Root terms unverified -> forced abstention (deterministic backstop)
+# ---------------------------------------------------------------------------
+
+def test_adjudicate_forces_insufficient_evidence_when_root_terms_unverified(scenario):
+    scenario.accept_all()
+    scenario.dispute_and_lock()
+    # Root terms body will NOT hash to case.root_terms_digest.
+    scenario.vm.mock_web(".*", {"status": 200, "body": "unrelated body, never matches the terms digest"})
+    # The model lies: claims full compliance AND claims rubricVerified=True.
+    # The contract must not trust either claim -- it computes rubricVerified
+    # itself from its own independent fetch and overrides both the returned
+    # verdict and persisted storage regardless of what the model said.
+    lying_verdict = json.dumps({
+        "rubricVerified": True,
+        "caseSatisfied": True,
+        "findings": [
+            {"spanId": sid, "finding": "COMPLIED", "material": False, "basisCodes": [], "evidenceRefs": [], "explanation": "lie"}
+            for sid in scenario.span_ids()
+        ],
+    })
+    scenario.vm.mock_llm(".*", lying_verdict)
+    scenario.vm.sender = scenario.owner
+    verdict = scenario.contract.adjudicate_case(scenario.case_id)
+
+    # Returned value must reflect the enforced outcome, not the model's claim.
+    assert verdict["caseSatisfied"] is False
+    for finding in verdict["findings"]:
+        assert finding["finding"] == "INSUFFICIENT_EVIDENCE"
+
+    # Persisted state must match.
+    case = scenario.contract.get_case(scenario.case_id)
+    assert case.case_satisfied is False
+    for span_id in scenario.span_ids():
+        span = scenario.contract.get_span(scenario.case_id, span_id)
+        assert span.finding == "INSUFFICIENT_EVIDENCE"
+
+    # And nothing gets slashed on an abstention.
+    scenario.contract.settle_case(scenario.case_id)
+    assert int(scenario.contract.get_claimable(scenario.provider_a)) == 1000 + 1000
+    assert int(scenario.contract.get_claimable(scenario.provider_b)) == 2000
+
+
+# ---------------------------------------------------------------------------
+# Obligation/delivery references are fetched and digest-verified, not trusted
+# ---------------------------------------------------------------------------
+
+def test_adjudicate_fetches_and_verifies_span_delivery_content(scenario):
+    scenario.accept_all()
+    delivery_body = "DELIVERY_UNIQUE_MARKER_XYZ"
+    delivery_digest = "sha256:" + hashlib.sha256(delivery_body.encode()).hexdigest()
+    scenario.vm.sender = scenario.provider_a
+    scenario.contract.submit_delivery(
+        scenario.case_id, scenario.span_a, "https://delivery.example.com/span_a", delivery_digest,
+    )
+    scenario.dispute_and_lock()
+
+    scenario.vm.mock_web(re.escape("https://example.com/terms"), {"status": 200, "body": DEFAULT_MOCK_BODY})
+    scenario.vm.mock_web(re.escape("https://delivery.example.com/span_a"), {"status": 200, "body": delivery_body})
+    scenario.vm.mock_web(".*", {"status": 200, "body": DEFAULT_MOCK_BODY})
+
+    # This mock only matches if the generated prompt actually contains the
+    # fetched delivery body -- proving the contract truly fetched and
+    # digest-verified it, rather than only passing the bare
+    # obligationRef/deliveryEvidence strings to the model on faith.
+    scenario.vm.mock_llm(
+        re.escape(delivery_body),
+        _valid_verdict(scenario.span_ids(), {
+            scenario.root_span: "COMPLIED", scenario.span_a: "COMPLIED", scenario.span_b: "COMPLIED",
+        }),
+    )
+    scenario.vm.sender = scenario.owner
+    verdict = scenario.contract.adjudicate_case(scenario.case_id)
+    assert verdict["caseSatisfied"] is False
+
+
+# ---------------------------------------------------------------------------
+# Slashed value goes to the case owner, never to whoever opened the dispute
+# ---------------------------------------------------------------------------
+
+def test_slashed_value_flows_to_owner_not_disputing_participant(scenario):
+    # provider_a (not the case owner) opens the dispute and would, under the
+    # old behavior, have received every slashed bond as case.claimant.
+    scenario.accept_all()
+    scenario.dispute_and_lock(disputant=scenario.provider_a)
+    findings = {scenario.root_span: "COMPLIED", scenario.span_a: "CAUSED_FAILURE", scenario.span_b: "COMPLIED"}
+    scenario.vm.mock_llm(".*", _valid_verdict(scenario.span_ids(), findings))
+    scenario.vm.mock_web(".*", {"status": 200, "body": DEFAULT_MOCK_BODY})
+    scenario.vm.sender = scenario.owner
+    scenario.contract.adjudicate_case(scenario.case_id)
+    scenario.contract.settle_case(scenario.case_id)
+
+    case = scenario.contract.get_case(scenario.case_id)
+    assert case.claimant == scenario.provider_a  # provider_a opened the dispute
+    # ...but the slashed value (span_a: 1000 bond * 5000bps = 500) goes to
+    # the case owner, not to provider_a who disputed and profits nothing
+    # extra for having done so.
+    assert int(scenario.contract.get_claimable(scenario.owner)) == 500
+    assert int(scenario.contract.get_claimable(scenario.provider_a)) == 1000 + 500  # root returned + span_a partial
