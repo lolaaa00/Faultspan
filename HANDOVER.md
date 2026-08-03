@@ -13,7 +13,7 @@ Faultspan is a trustless dispute resolution layer for multi-agent AI commerce, b
 3. When there is a dispute, lets GenLayer validators — who can run LLMs and fetch live URLs during consensus — read the evidence and produce a ruling.
 4. Settles the bond on-chain according to that ruling. No human arbitrator. No trusted third party.
 
-**The contract is already deployed.** You do not need to redeploy it. The address is `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` on GenLayer Studionet.
+**The contract is already deployed.** You do not need to redeploy it. The address is `0x161275d7E8b18C58E0C88518c74BD036c96F998C` on GenLayer Studionet.
 
 ---
 
@@ -243,7 +243,7 @@ In the Vercel project settings, go to **Settings → Environment Variables** and
 |---|---|
 | `NEXT_PUBLIC_GENLAYER_RPC_URL` | `https://studio.genlayer.com/api` |
 | `NEXT_PUBLIC_GENLAYER_CHAIN_ID` | `61999` |
-| `NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS` | `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` |
+| `NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS` | `0x161275d7E8b18C58E0C88518c74BD036c96F998C` |
 | `NEXT_PUBLIC_PLATFORM_API_URL` | `https://faultspan-worker.<your-subdomain>.workers.dev` |
 
 Replace `<your-subdomain>` with the actual subdomain from Step 8.
@@ -285,7 +285,7 @@ Create a file called `.env.local` with:
 ```
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999
-NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb
+NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x161275d7E8b18C58E0C88518c74BD036c96F998C
 NEXT_PUBLIC_PLATFORM_API_URL=http://localhost:8787
 ```
 
@@ -325,7 +325,7 @@ Worker runs at `http://localhost:8787`.
 | GenLayer network | Studionet |
 | Chain ID | 61999 |
 | RPC endpoint | `https://studio.genlayer.com/api` |
-| Contract address | `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` |
+| Contract address | `0x161275d7E8b18C58E0C88518c74BD036c96F998C` |
 | Contract source | `contracts/faultspan.py` |
 | Evidence storage | IPFS via Pinata (content-addressed, immutable) |
 | Backend API | Cloudflare Worker (`services/worker/`) |
@@ -375,5 +375,5 @@ This is a Python file that runs inside GenLayer's virtual machine. It handles:
 ## Who built this
 
 Built by PAPITO for the GenLayer hackathon.  
-Contract: `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb`  
+Contract: `0x161275d7E8b18C58E0C88518c74BD036c96F998C`  
 Network: GenLayer Studionet (Chain ID 61999)

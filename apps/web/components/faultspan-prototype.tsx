@@ -210,7 +210,7 @@ export function FaultspanPrototype({ initialView = "overview", initialCaseId }: 
 
           {view === "overview" && <section className="landing-panel" aria-labelledby="landing-title">
             <div className="landing-copy"><span className="eyebrow">Agentic dispute resolution</span><h1 id="landing-title">Faultspan</h1><p>Attribute failures across multi-agent commerce, pin public evidence to IPFS, and submit adjudication flows to the GenLayer Studionet contract.</p><div className="landing-actions"><button className="button button-primary" onClick={openCaseBuilder}><Plus aria-hidden="true" size={16} />Create real case</button><button className="button button-secondary" onClick={openEvidenceBuilder}><FileUp aria-hidden="true" size={16} />Submit evidence</button></div></div>
-            <div className="landing-instrument" aria-label="Live configuration"><div><span>Contract</span><strong className="mono">0x6Bd6...2DDb</strong></div><div><span>RPC</span><strong>studio.genlayer.com/api</strong></div><div><span>Storage</span><strong>IPFS via Pinata</strong></div></div>
+            <div className="landing-instrument" aria-label="Live configuration"><div><span>Contract</span><strong className="mono">{shortAddress(process.env.NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS)}</strong></div><div><span>RPC</span><strong>studio.genlayer.com/api</strong></div><div><span>Storage</span><strong>IPFS via Pinata</strong></div></div>
           </section>}
 
 

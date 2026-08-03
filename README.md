@@ -102,7 +102,7 @@ All consensus outputs are validated inside the contract before being written to 
 | Network | GenLayer Studionet |
 | Chain ID | `61999` |
 | RPC | `https://studio.genlayer.com/api` |
-| Address | `0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` |
+| Address | `0x161275d7E8b18C58E0C88518c74BD036c96F998C` |
 | Source | `contracts/faultspan.py` |
 
 > **Note:** The contract is pinned to genvm `v0.2.16` (see comment at the top of `contracts/faultspan.py`) because `v0.3.0-rc7` dropped the `genvm-universal.tar.xz` asset that `gltest` depends on. Redeploying against a newer GenLayer SDK/genvm version may require re-validating this compatibility.
@@ -166,7 +166,7 @@ Create `apps/web/.env.local`:
 ```
 NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999
-NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb
+NEXT_PUBLIC_FAULTSPAN_CONTRACT_ADDRESS=0x161275d7E8b18C58E0C88518c74BD036c96F998C
 NEXT_PUBLIC_PLATFORM_API_URL=http://localhost:8787
 ```
 

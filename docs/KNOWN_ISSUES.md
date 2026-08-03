@@ -1,5 +1,67 @@
 # Known Issues
 
+## Resolved: adjudication-integrity and dispute-incentive gaps (external review)
+
+**Status:** Fixed and redeployed. Contract address changed from
+`0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb` to
+`0x161275d7E8b18C58E0C88518c74BD036c96F998C`.
+
+An external review of `contracts/faultspan.py` identified four real,
+verified gaps in the deployed contract:
+
+1. **`adjudicate_case` never fetched or digest-verified `span.obligation_ref`
+   or the delivery reference set by `submit_delivery`.** They were passed
+   into the adjudication prompt as bare, unverified strings — the model
+   could be asked to judge compliance against content it never actually saw.
+   **Fix:** the contract now fetches and digest-verifies each span's
+   obligation and delivery reference the same way it already did for root
+   terms and dispute evidence, and tells the model a span is unverified
+   (must return `INSUFFICIENT_EVIDENCE`) unless the fetched digest matches.
+
+2. **When root terms could not be fetched or digest-verified, the contract
+   let the model adjudicate against a generic fallback standard instead of
+   forcing abstention.** **Fix:** the contract now computes the digest
+   match itself (not the model's self-report) and deterministically
+   overrides every finding to `INSUFFICIENT_EVIDENCE` and `caseSatisfied` to
+   `false` when it doesn't verify — enforced on both the returned value and
+   persisted storage, regardless of what the model claims. Each validator
+   computes this independently, so consensus requires genuine agreement on
+   the real fetch outcome, not a shared trust in one validator's report.
+
+3. **Any participant could open a dispute, immediately lock the evidence
+   record with no counter-evidence window, and receive 100% of any slashed
+   value as `case.claimant`.** The same actor controlled dispute procedure
+   and had a direct financial incentive from its outcome. **Fix:**
+   `lock_evidence` now requires `MIN_EVIDENCE_WINDOW_SECONDS` (1 hour) to
+   elapse since the dispute opened before *anyone*, including the claimant,
+   may lock — and slashed value now flows to `case.owner`, never to
+   `case.claimant`, decoupling who can trigger a dispute from who profits.
+
+4. **`open_dispute` only required the case to be `ACTIVE`**, which happens
+   the moment a single span is bonded — a dispute (and real slashing) could
+   run while other registered spans were still `PROPOSED`, i.e. their
+   providers never committed at all. **Fix:** `open_dispute` now requires
+   every registered span to be bonded first.
+
+**Verification performed:**
+- `genvm-lint`: clean.
+- `tests/direct/test_faultspan.py`: 34/34 pass, including six new tests
+  written specifically to prove each fix — notably one where the mocked
+  model *lies* (claims full compliance and claims the root terms verified)
+  and the contract still forces abstention, proving the override does not
+  trust the model's self-report.
+- Live Studionet: the redeployed contract's schema matches
+  `scripts/verify-schema.ts` exactly. `scripts/studionet-fix-smoke.ts` drove
+  real transactions against the live redeployed contract and confirmed, on
+  real consensus: `open_dispute` correctly reverts while a span is still
+  `PROPOSED`; `open_dispute` succeeds once all spans are bonded;
+  `lock_evidence` correctly reverts immediately after a dispute opens,
+  before the minimum window elapses.
+- The `MIN_EVIDENCE_WINDOW_SECONDS` real-time wait (1 hour) means
+  `tests/integration/test_faultspan_studionet.py` now takes roughly an hour
+  end to end instead of 1–3 minutes; it remains an on-demand/weekly job,
+  not part of per-push CI (see `.github/workflows/studionet-smoke.yml`).
+
 ## `get_claimable` fails on real Studionet after `settle_case` writes to the claimable ledger
 
 **Status:** Confirmed, reproducible, unresolved. Blocks the documented

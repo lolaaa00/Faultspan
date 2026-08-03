@@ -49,7 +49,7 @@ jobs:
       - run: npm ci
       - run: npm run verify:schema
         env:
-          FAULTSPAN_CONTRACT_ADDRESS: "0x6Bd6be8Ab30f4C3F39e038383fe3d2A49b212DDb"
+          FAULTSPAN_CONTRACT_ADDRESS: "0x161275d7E8b18C58E0C88518c74BD036c96F998C"
 
   secret-scan:
     name: Secret scanning
